@@ -1,5 +1,6 @@
 package com.marriagenetwork.userservice;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime; // Import JPA annotations
 
 import jakarta.persistence.Column; // For Lombok annotations
@@ -34,6 +35,9 @@ public class User {
     @Column(nullable = false) // Password hash must be present
     private String passwordHash; // Stores the hashed password (NEVER store plain passwords!)
 
+    @Column 
+    private String fullName; 
+
     @Column(columnDefinition = "TEXT") // Allows for longer text, like a bio or profile summary
     private String bio; // User's short biography
 
@@ -41,7 +45,7 @@ public class User {
     private String gender; // User's gender
 
     @Column
-    private String dateOfBirth; // User's date of birth (consider using LocalDate for better type safety later)
+    private LocalDate dateOfBirth; // User's date of birth (consider using LocalDate for better type safety later)
 
     @Column
     private String city; // User's city
