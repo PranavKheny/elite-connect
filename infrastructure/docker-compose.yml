@@ -1,0 +1,22 @@
+version: '3.8' # Specifies the Docker Compose file format version
+
+services:
+  # Our PostgreSQL Database Service
+  db:
+    image: postgres:13-alpine # Using a lightweight PostgreSQL 13 image
+    container_name: marriage_network_db # A friendly name for our database container
+    environment:
+      POSTGRES_DB: users_db           # The name of the database to create
+      POSTGRES_USER: user             # The database username
+      POSTGRES_PASSWORD: password     # The database password
+    ports:
+      - "5432:5432" # Maps host port 5432 to container port 5432.
+                    # This allows you to connect to the database from your host machine.
+    volumes:
+      - db_data:/var/lib/postgresql/data # Mount a named volume to persist data
+                                         # This ensures your data isn't lost when the container stops/restarts
+
+  # (We'll add other services here later, like user-service, matching-service etc.)
+
+volumes:
+  db_data: # Define the named volume for database persistence
