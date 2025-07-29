@@ -1,8 +1,9 @@
-package com.marriagenetwork.userservice.dto;
+package com.eliteconnect.userservice.dto;
 
-import com.marriagenetwork.userservice.User; // Import your User entity
-import java.time.LocalDate;
+import java.time.LocalDate; // Import your User entity
 import java.time.LocalDateTime;
+
+import com.eliteconnect.userservice.User;
 
 public class UserResponse {
     private Long id;

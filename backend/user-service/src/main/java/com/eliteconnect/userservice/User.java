@@ -1,4 +1,4 @@
-package com.marriagenetwork.userservice;
+package com.eliteconnect.userservice;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime; // Import JPA annotations

@@ -1,14 +1,14 @@
 version: '3.8' # Specifies the Docker Compose file format version
 
 services:
-  # Our PostgreSQL Database Service
+  # Our PostgreSQL Database Service for Elite Connect
   db:
     image: postgres:13-alpine # Using a lightweight PostgreSQL 13 image
-    container_name: marriage_network_db # A friendly name for our database container
+    container_name: elite_connect_db # A friendly name for our database container, updated for Elite Connect
     environment:
-      POSTGRES_DB: users_db           # The name of the database to create
-      POSTGRES_USER: user             # The database username
-      POSTGRES_PASSWORD: password     # The database password
+      POSTGRES_DB: elite_connect_db    # The name of the database to create, updated for Elite Connect
+      POSTGRES_USER: user            # The database username
+      POSTGRES_PASSWORD: password    # The database password
     ports:
       - "5432:5432" # Maps host port 5432 to container port 5432.
                     # This allows you to connect to the database from your host machine.

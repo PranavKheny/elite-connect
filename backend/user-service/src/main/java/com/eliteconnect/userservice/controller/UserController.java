@@ -1,16 +1,25 @@
-package com.marriagenetwork.userservice.controller;
-
-import com.marriagenetwork.userservice.User; // Import your User entity
-import com.marriagenetwork.userservice.dto.UserRequest; // Import UserRequest DTO
-import com.marriagenetwork.userservice.dto.UserResponse; // Import UserResponse DTO
-import com.marriagenetwork.userservice.service.UserService;
-import jakarta.validation.Valid; // Import for validation annotation
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+package com.eliteconnect.userservice.controller;
 
 import java.util.List;
-import java.util.stream.Collectors; // To help map lists
+import java.util.stream.Collectors;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.eliteconnect.userservice.User; // Correct: Imports User entity
+import com.eliteconnect.userservice.dto.UserRequest; // Correct: Imports UserRequest DTO
+import com.eliteconnect.userservice.dto.UserResponse; // Correct: Imports UserResponse DTO
+import com.eliteconnect.userservice.service.UserService;
+
+import jakarta.validation.Valid; // Correct: Imports for validation annotation
 
 @RestController // Marks this class as a REST Controller, handling incoming web requests
 @RequestMapping("/api/users") // Base URL path for all endpoints in this controller
@@ -33,7 +42,7 @@ public class UserController {
         User user = new User();
         user.setUsername(userRequest.getUsername());
         user.setEmail(userRequest.getEmail());
-        user.setPasswordHash(userRequest.getPasswordHash()); // In a real app, hash this password securely!
+        user.setPasswordHash(userRequest.getPassword()); // FIX: Call getPassword() from UserRequest
         user.setFullName(userRequest.getFullName());
         user.setGender(userRequest.getGender());
         user.setDateOfBirth(userRequest.getDateOfBirth());
@@ -79,7 +88,7 @@ public class UserController {
         User userDetails = new User(); // Create a new User entity to hold the updated details from DTO
         userDetails.setUsername(userRequest.getUsername());
         userDetails.setEmail(userRequest.getEmail());
-        userDetails.setPasswordHash(userRequest.getPasswordHash()); // Still needs to be hashed in a real app
+        userDetails.setPasswordHash(userRequest.getPassword()); // FIX: Call getPassword() from UserRequest
         userDetails.setFullName(userRequest.getFullName());
         userDetails.setGender(userRequest.getGender());
         userDetails.setDateOfBirth(userRequest.getDateOfBirth());

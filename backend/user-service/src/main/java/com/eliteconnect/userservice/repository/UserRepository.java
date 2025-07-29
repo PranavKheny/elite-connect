@@ -1,11 +1,11 @@
-package com.marriagenetwork.userservice.repository;
+package com.eliteconnect.userservice.repository;
 
 import java.util.Optional; // Import JpaRepository
 
 import org.springframework.data.jpa.repository.JpaRepository; // Import @Repository annotation
 import org.springframework.stereotype.Repository; // Import Optional for handling potential null results
 
-import com.marriagenetwork.userservice.User;
+import com.eliteconnect.userservice.User;
 
 @Repository // Marks this interface as a Spring Data JPA repository component
 public interface UserRepository extends JpaRepository<User, Long> {

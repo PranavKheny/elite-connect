@@ -1,25 +1,29 @@
-package com.marriagenetwork.userservice.service;
+package com.eliteconnect.userservice.service;
 
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // Import BCryptPasswordEncoder
 import org.springframework.stereotype.Service;
 
-import com.marriagenetwork.userservice.User;
-import com.marriagenetwork.userservice.repository.UserRepository;
+import com.eliteconnect.userservice.User;
+import com.eliteconnect.userservice.repository.UserRepository;
 
-import lombok.RequiredArgsConstructor;
+import lombok.RequiredArgsConstructor; // Ensure this import is present if using Lombok
 
 @Service // Marks this class as a Spring Service component
 @RequiredArgsConstructor // Lombok: Generates a constructor with required arguments (final fields)
 public class UserService {
 
     private final UserRepository userRepository; // Inject the UserRepository
+    private final BCryptPasswordEncoder passwordEncoder; // Inject BCryptPasswordEncoder for password hashing
 
     // Method to create a new user (renamed from registerUser to match UserController)
     public User createUser(User user) {
-        // In a real application, you would encode the password here before saving
-        // user.setPasswordHash(passwordEncoder.encode(user.getPasswordHash()));
+        // Hash the password before saving
+        // The 'user' object here receives the plain password from the DTO,
+        // which then gets set to its passwordHash field.
+        user.setPasswordHash(passwordEncoder.encode(user.getPasswordHash())); // HASH THE PASSWORD
         return userRepository.save(user);
     }
 
@@ -41,10 +45,11 @@ public class UserService {
         // Update specific fields from userDetails (coming from DTO via controller)
         user.setUsername(userDetails.getUsername());
         user.setEmail(userDetails.getEmail());
-        // Only update passwordHash if it's provided (not null/empty) for security reasons.
-        // In a real app, this would involve hashing the new password.
+
+        // Only update passwordHash if a new password is provided and not empty.
+        // HASH THE NEW PASSWORD before saving.
         if (userDetails.getPasswordHash() != null && !userDetails.getPasswordHash().isEmpty()) {
-            user.setPasswordHash(userDetails.getPasswordHash());
+            user.setPasswordHash(passwordEncoder.encode(userDetails.getPasswordHash())); // HASH THE NEW PASSWORD
         }
         user.setFullName(userDetails.getFullName());
         user.setGender(userDetails.getGender());
@@ -72,9 +77,8 @@ public class UserService {
         Optional<User> userOptional = userRepository.findByUsername(username);
         if (userOptional.isPresent()) {
             User user = userOptional.get();
-            // In a real app, you'd compare rawPassword with user.getPasswordHash() using a password encoder (e.g., BCrypt)
-            // For now, let's assume rawPassword matches the stored passwordHash for demonstration (NOT SECURE!)
-            if (user.getPasswordHash().equals(rawPassword)) {
+            // Use passwordEncoder.matches() to compare the raw password with the stored hashed password
+            if (passwordEncoder.matches(rawPassword, user.getPasswordHash())) { // SECURE PASSWORD COMPARISON
                 return Optional.of(user);
             }
         }

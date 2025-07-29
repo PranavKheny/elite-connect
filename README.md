@@ -1,2 +1,3 @@
-# marriage-network-app
-MVP for a social network for marriage-age adults.
+# Elite Connect: HNIN Social Networking Application
+
+**MVP for an exclusive social network for High Net-Worth Individuals (HNIN).**
