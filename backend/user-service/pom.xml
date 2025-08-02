@@ -11,8 +11,8 @@
     <groupId>com.eliteconnect</groupId> <!-- Updated Group ID for Elite Connect -->
     <artifactId>user-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>elite-connect-user-service</name> <!-- Updated Name for Elite Connect User Service -->
-    <description>User Service for Elite Connect: HNIN Social Networking Application</description> <!-- Updated Description for HNIN -->
+    <name>hnin-connect-user-service</name> <!-- Updated Name for Elite Connect User Service -->
+    <description>User Service for HNIN Connect: A Professional Network</description> <!-- Updated Description for HNIN -->
     <url/>
     <licenses>
         <license/>
