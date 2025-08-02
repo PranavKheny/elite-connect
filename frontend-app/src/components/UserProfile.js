@@ -28,20 +28,15 @@ const UserProfile = () => {
                 });
 
                 // Assuming the backend returns a list of users, find the current one.
-                // This is a simple way for now. We can improve this later.
-                const currentUser = response.data.find(u => u.username === 'testuser2'); 
-                // Note: 'testuser2' is the user we registered. If you registered a different user like 'newuser', use that name.
-
+                const currentUser = response.data.find(u => u.username === 'testuser');
                 if (currentUser) {
                     setUser(currentUser);
                     setMessage('');
                 } else {
                     setMessage('Could not find user profile.');
                 }
-
             } catch (error) {
                 console.error('Failed to fetch user profile:', error.response ? error.response.data : error.message);
-                // Handle expired tokens or other errors
                 setMessage('Session expired or access denied. Please log in again.');
                 localStorage.removeItem('jwtToken');
                 setTimeout(() => navigate('/login'), 2000);
@@ -57,26 +52,54 @@ const UserProfile = () => {
         navigate('/login');
     };
 
+    // A placeholder function for the edit profile button
+    const handleEditProfile = () => {
+        // This is a placeholder. You can implement the full functionality later.
+        console.log("Edit Profile button clicked!");
+        // e.g., navigate('/profile/edit');
+    };
+
     if (message) {
-        return <div style={{ textAlign: 'center', marginTop: '50px' }}>{message}</div>;
+        return (
+            <div className="hero is-fullheight">
+                <div className="hero-body">
+                    <div className="container has-text-centered">
+                        <p className="title is-4">{message}</p>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-            <div style={{ float: 'right' }}>
-                <button onClick={handleLogout}>Logout</button>
-            </div>
-            <h2>User Profile</h2>
-            {user ? (
-                <div>
-                    <p><strong>Username:</strong> {user.username}</p>
-                    <p><strong>Full Name:</strong> {user.fullName}</p>
-                    <p><strong>Email:</strong> {user.email}</p>
-                    <p><strong>Bio:</strong> {user.bio || 'N/A'}</p>
+        <div className="container mt-6">
+            <div className="columns is-centered">
+                <div className="column is-half">
+                    <div className="box">
+                        <div className="is-flex is-justify-content-space-between is-align-items-center mb-4">
+                            <h2 className="title is-3 mb-0">User Profile</h2>
+                            <div>
+                                <button className="button is-info is-light mr-2" onClick={handleEditProfile}>
+                                    Edit Profile
+                                </button>
+                                <button className="button is-danger is-outlined" onClick={handleLogout}>
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                        {user ? (
+                            <div>
+                                <p className="block"><strong>Username:</strong> {user.username}</p>
+                                <p className="block"><strong>Full Name:</strong> {user.fullName}</p>
+                                <p className="block"><strong>Email:</strong> {user.email}</p>
+                                <p className="block"><strong>Bio:</strong> {user.bio || 'N/A'}</p>
+                            </div>
+                        ) : (
+                            <p>No user data found.</p>
+                        )}
+                    </div>
                 </div>
-            ) : (
-                <p>No user data found.</p>
-            )}
+            </div>
         </div>
     );
 };
