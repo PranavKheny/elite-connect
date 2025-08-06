@@ -1,11 +1,13 @@
 package com.eliteconnect.userservice.controller;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.springframework.http.HttpStatus; // NEW IMPORT: To work with Optional correctly
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,12 +26,13 @@ import com.eliteconnect.userservice.dto.AuthRequest;
 import com.eliteconnect.userservice.dto.AuthResponse;
 import com.eliteconnect.userservice.dto.UserRequest;
 import com.eliteconnect.userservice.dto.UserResponse;
+// NEW IMPORT: This is for our new DTO
+import com.eliteconnect.userservice.dto.VerifyUserRequest;
 import com.eliteconnect.userservice.exception.UserNotFoundException;
 import com.eliteconnect.userservice.service.UserService;
 import com.eliteconnect.userservice.util.JwtUtil;
 
 import jakarta.validation.Valid;
-
 
 @RestController
 @RequestMapping("/api/users")
@@ -72,15 +75,41 @@ public class UserController {
     // POST /api/users/login
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest authRequest) throws Exception {
-        Authentication authentication = authenticationManager.authenticate(
+        authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword())
         );
 
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getUsername());
-        final String jwt = jwtUtil.generateToken(userDetails);
+        Optional<User> userOptional = userService.findUserByUsername(authRequest.getUsername());
 
-        return ResponseEntity.ok(new AuthResponse(jwt));
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            if (!user.isVerified()) {
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(new AuthResponse("Account is not yet verified."));
+            }
+
+            final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getUsername());
+            final String jwt = jwtUtil.generateToken(userDetails);
+            return ResponseEntity.ok(new AuthResponse(jwt));
+            
+        } else {
+            throw new BadCredentialsException("Invalid username or password");
+        }
     }
+
+    // NEW ADMIN ENDPOINT START
+    // PUT /api/users/{id}/verify
+    @PutMapping("/{id}/verify")
+    public ResponseEntity<UserResponse> updateUserVerificationStatus(
+            @PathVariable Long id, 
+            @Valid @RequestBody VerifyUserRequest request) {
+        
+        // This method will be implemented in the UserService in the next step.
+        User updatedUser = userService.updateUserVerificationStatus(id, request.isVerified(), request.getVerificationNotes());
+        return ResponseEntity.ok(new UserResponse(updatedUser));
+    }
+    // NEW ADMIN ENDPOINT END
 
 
     // GET /api/users
@@ -96,10 +125,9 @@ public class UserController {
     // GET /api/users/{id}
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
-        // FIX: Correctly handle Optional, throw exception, then return ResponseEntity
         User user = userService.getUserById(id)
             .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + id));
-        return ResponseEntity.ok(new UserResponse(user)); // Return 200 OK with UserResponse
+        return ResponseEntity.ok(new UserResponse(user));
     }
 
     // PUT /api/users/{id}
