@@ -1,8 +1,101 @@
-// frontend-app/src/components/auth/RegisterForm.js
+// frontend-app/src/components/RegisterForm.js
 
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import styled from 'styled-components';
+
+// --- Styled Components ---
+const StyledContainer = styled(motion.div)`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: ${(props) => props.theme.colors.primary};
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const StyledForm = styled(motion.form)`
+  display: flex;
+  flex-direction: column;
+  background-color: ${(props) => props.theme.colors.secondary};
+  padding: 4rem;
+  border-radius: ${(props) => props.theme.borderRadius};
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 450px;
+`;
+
+const StyledTitle = styled.h2`
+  font-family: ${(props) => props.theme.fonts.heading};
+  font-size: ${(props) => props.theme.fontSizes.medium};
+  margin-bottom: ${(props) => props.theme.spacing.large};
+  text-align: center;
+  text-transform: uppercase;
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const StyledLabel = styled.label`
+  font-family: ${(props) => props.theme.fonts.body};
+  margin-bottom: 0.5rem;
+  color: ${(props) => props.theme.colors.accent};
+`;
+
+const StyledInput = styled.input`
+  width: 100%;
+  padding: 0.8rem;
+  margin-bottom: ${(props) => props.theme.spacing.large};
+  background-color: transparent;
+  border: 1px solid ${(props) => props.theme.colors.accent};
+  border-radius: ${(props) => props.theme.borderRadius};
+  color: ${(props) => props.theme.colors.text};
+  font-family: ${(props) => props.theme.fonts.body};
+
+  &:focus {
+    outline: none;
+    border-color: ${(props) => props.theme.colors.highlight};
+  }
+`;
+
+const StyledButton = styled(motion.button)`
+  font-family: ${(props) => props.theme.fonts.heading};
+  font-weight: bold;
+  padding: 1rem;
+  border-radius: ${(props) => props.theme.borderRadius};
+  background-color: transparent;
+  color: ${(props) => props.theme.colors.text};
+  border: 2px solid ${(props) => props.theme.colors.highlight};
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
+
+  &:hover {
+    background-color: ${(props) => props.theme.colors.highlight};
+    color: ${(props) => props.theme.colors.primary};
+  }
+`;
+
+const StyledMessage = styled.p`
+  text-align: center;
+  margin-top: ${(props) => props.theme.spacing.medium};
+  color: ${(props) => (props.isSuccess ? 'green' : props.theme.colors.danger)};
+`;
+
+const StyledLink = styled(Link)`
+  text-align: center;
+  margin-top: ${(props) => props.theme.spacing.medium};
+  color: ${(props) => props.theme.colors.highlight};
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
+// --- Animation Variants ---
+const formVariants = {
+  hidden: { opacity: 0, y: 50 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+};
 
 const RegisterForm = () => {
   const [formData, setFormData] = useState({
@@ -18,6 +111,7 @@ const RegisterForm = () => {
   });
   const [message, setMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -25,113 +119,68 @@ const RegisterForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage(''); // Clear previous messages
+    setMessage('');
     try {
       const response = await axios.post('http://localhost:8080/api/users/register', formData, {
         headers: {
           'Content-Type': 'application/json',
         },
       });
-      console.log('Registration successful:', response.data);
       setMessage('Registration successful! You can now log in.');
       setIsSuccess(true);
+      setTimeout(() => {
+        navigate('/login');
+      }, 1500);
     } catch (error) {
-      console.error('Registration failed:', error.response ? error.response.data : error.message);
       setMessage(error.response ? `Error: ${error.response.data.message}` : 'An unexpected error occurred.');
       setIsSuccess(false);
     }
   };
 
   return (
-    <div className="hero is-fullheight">
-      <div className="hero-body">
-        <div className="container">
-          <div className="columns is-centered">
-            <div className="column is-two-fifths">
-              <div className="box">
-                <h1 className="title has-text-centered">Register for HNIN Connect</h1>
-                <form onSubmit={handleSubmit}>
-                  <div className="field">
-                    <label className="label">Username</label>
-                    <div className="control">
-                      <input
-                        className="input"
-                        type="text"
-                        name="username"
-                        placeholder="Choose a username"
-                        value={formData.username}
-                        onChange={handleChange}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="field">
-                    <label className="label">Email</label>
-                    <div className="control">
-                      <input
-                        className="input"
-                        type="email"
-                        name="email"
-                        placeholder="e.g., alexsmith@example.com"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="field">
-                    <label className="label">Password</label>
-                    <div className="control">
-                      <input
-                        className="input"
-                        type="password"
-                        name="password"
-                        placeholder="Create a strong password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="field">
-                    <label className="label">Full Name</label>
-                    <div className="control">
-                      <input
-                        className="input"
-                        type="text"
-                        name="fullName"
-                        placeholder="Your full name"
-                        value={formData.fullName}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="field">
-                    <div className="control">
-                      <button className="button is-primary is-fullwidth" type="submit">
-                        Register
-                      </button>
-                    </div>
-                  </div>
-                </form>
-                {message && (
-                  <p className={`mt-4 has-text-centered ${isSuccess ? 'has-text-success' : 'has-text-danger'}`}>
-                    {message}
-                  </p>
-                )}
-                <div className="has-text-centered mt-4">
-                  <p>Already have an account? <Link to="/login">Login here.</Link></p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <StyledContainer>
+      <StyledForm variants={formVariants} initial="hidden" animate="visible" onSubmit={handleSubmit}>
+        <StyledTitle>Register for HNIN Connect</StyledTitle>
+        <StyledLabel htmlFor="username">Username</StyledLabel>
+        <StyledInput
+          type="text"
+          id="username"
+          name="username"
+          value={formData.username}
+          onChange={handleChange}
+          required
+        />
+        <StyledLabel htmlFor="email">Email</StyledLabel>
+        <StyledInput
+          type="email"
+          id="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          required
+        />
+        <StyledLabel htmlFor="password">Password</StyledLabel>
+        <StyledInput
+          type="password"
+          id="password"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          required
+        />
+        <StyledLabel htmlFor="fullName">Full Name</StyledLabel>
+        <StyledInput
+          type="text"
+          id="fullName"
+          name="fullName"
+          value={formData.fullName}
+          onChange={handleChange}
+        />
+        <StyledButton type="submit">Register</StyledButton>
+        {message && <StyledMessage isSuccess={isSuccess}>{message}</StyledMessage>}
+        <StyledLink to="/login">Already have an account? Login here.</StyledLink>
+      </StyledForm>
+    </StyledContainer>
   );
 };
 
