@@ -5,91 +5,93 @@ import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
+import { useAuth } from '../App';
 
-// --- Styled Components ---
+// --- Styled Components (with styling guide values) ---
 const StyledContainer = styled(motion.div)`
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: ${(props) => props.theme.colors.primary};
-  color: ${(props) => props.theme.colors.text};
+  background-color: #334155; /* Primary Background */
+  color: #f8fafc; /* Text */
+  padding: 2rem;
 `;
 
 const StyledForm = styled(motion.form)`
   display: flex;
   flex-direction: column;
-  background-color: ${(props) => props.theme.colors.secondary};
-  padding: 4rem; /* Increased padding */
-  border-radius: ${(props) => props.theme.borderRadius};
+  background-color: #1f2937; /* Secondary Background */
+  padding: 4rem;
+  border-radius: 8px; /* Consistent border radius */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   width: 100%;
-  max-width: 450px; /* Increased max-width */
+  max-width: 450px;
 `;
 
 const StyledTitle = styled.h2`
-  font-family: ${(props) => props.theme.fonts.heading};
-  font-size: ${(props) => props.theme.fontSizes.medium};
-  margin-bottom: ${(props) => props.theme.spacing.large};
+  font-family: 'sans-serif';
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
   text-align: center;
   text-transform: uppercase;
-  color: ${(props) => props.theme.colors.text};
+  color: #f8fafc;
 `;
 
 const StyledLabel = styled.label`
-  font-family: ${(props) => props.theme.fonts.body};
+  font-family: 'serif';
   margin-bottom: 0.5rem;
-  color: ${(props) => props.theme.colors.accent}; /* A subtle accent color for labels */
+  color: #94a3b8;
 `;
 
 const StyledInput = styled.input`
   width: 100%;
   padding: 0.8rem;
-  margin-bottom: ${(props) => props.theme.spacing.large}; /* Increased margin */
+  margin-bottom: 1.5rem;
   background-color: transparent;
-  border: 1px solid ${(props) => props.theme.colors.accent};
-  border-radius: ${(props) => props.theme.borderRadius};
-  color: ${(props) => props.theme.colors.text};
-  font-family: ${(props) => props.theme.fonts.body};
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  color: #f8fafc;
+  font-family: 'serif';
 
   &:focus {
     outline: none;
-    border-color: ${(props) => props.theme.colors.highlight};
+    border-color: #3b82f6;
   }
 `;
 
 const StyledButton = styled(motion.button)`
-  font-family: ${(props) => props.theme.fonts.heading};
+  font-family: 'sans-serif';
   font-weight: bold;
   padding: 1rem;
-  border-radius: ${(props) => props.theme.borderRadius};
-  background-color: transparent; /* Made the button outlined */
-  color: ${(props) => props.theme.colors.text};
-  border: 2px solid ${(props) => props.theme.colors.highlight}; /* Added a solid border */
+  border-radius: 8px;
+  background-color: transparent;
+  color: #f8fafc;
+  border: 2px solid #3b82f6;
   cursor: pointer;
   transition: background-color 0.3s, color 0.3s;
 
   &:hover {
-    background-color: ${(props) => props.theme.colors.highlight};
-    color: ${(props) => props.theme.colors.primary};
+    background-color: #3b82f6;
+    color: #334155;
   }
 `;
 
 const StyledMessage = styled.p`
   text-align: center;
-  margin-top: ${(props) => props.theme.spacing.medium};
-  color: ${(props) => (props.isSuccess ? 'green' : props.theme.colors.danger)};
+  margin-top: 1rem;
+  color: ${(props) => (props.isSuccess ? '#22c55e' : '#ef4444')};
 `;
 
 const StyledLinkContainer = styled.div`
   display: flex;
   justify-content: space-between;
-  margin-top: ${(props) => props.theme.spacing.medium};
+  margin-top: 1rem;
 `;
 
 const StyledLink = styled(Link)`
-  font-family: ${(props) => props.theme.fonts.body};
-  color: ${(props) => props.theme.colors.highlight};
+  font-family: 'serif';
+  color: #3b82f6;
   text-decoration: none;
   &:hover {
     text-decoration: underline;
@@ -111,6 +113,7 @@ const LoginForm = () => {
   const [message, setMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const navigate = useNavigate();
+  const auth = useAuth();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -120,18 +123,35 @@ const LoginForm = () => {
     e.preventDefault();
     setMessage('');
     try {
-      const response = await axios.post('http://localhost:8080/api/users/login', formData, {
+      const response = await axios.post('/api/users/login', formData, {
         headers: {
           'Content-Type': 'application/json',
         },
       });
       const jwtToken = response.data.jwtToken;
-      setMessage('Login successful! Redirecting to profile...');
-      setIsSuccess(true);
-      localStorage.setItem('jwtToken', jwtToken);
-      setTimeout(() => {
-        navigate('/profile');
-      }, 1500);
+      
+      const userResponse = await axios.get('/api/users/me', {
+        headers: {
+          Authorization: `Bearer ${jwtToken}`,
+        },
+      });
+      const user = userResponse.data;
+
+      auth.login(user, jwtToken);
+
+      if (user.isVerified) {
+        setMessage('Login successful! Redirecting to dashboard...');
+        setIsSuccess(true);
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
+      } else {
+        setMessage('Login successful! Redirecting to profile...');
+        setIsSuccess(true);
+        setTimeout(() => {
+          navigate('/profile');
+        }, 1500);
+      }
     } catch (error) {
       setMessage(error.response ? `Error: ${error.response.data.message}` : 'An unexpected error occurred.');
       setIsSuccess(false);
@@ -163,8 +183,8 @@ const LoginForm = () => {
         <StyledButton type="submit">Log in</StyledButton>
         {message && <StyledMessage isSuccess={isSuccess}>{message}</StyledMessage>}
         <StyledLinkContainer>
-            <StyledLink to="/forgot-password">Forgot Password?</StyledLink>
-            <StyledLink to="/register">Register here.</StyledLink>
+          <StyledLink to="/forgot-password">Forgot Password?</StyledLink>
+          <StyledLink to="/register">Register here.</StyledLink>
         </StyledLinkContainer>
       </StyledForm>
     </StyledContainer>

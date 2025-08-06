@@ -1,95 +1,87 @@
 package com.eliteconnect.userservice;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource; // NEW IMPORT
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import com.eliteconnect.userservice.security.CustomUserDetails; // NEW IMPORT
-import com.eliteconnect.userservice.security.JwtRequestFilter; // NEW IMPORT
-import com.eliteconnect.userservice.service.UserService; // NEW IMPORT
+import com.eliteconnect.userservice.repository.UserRepository;
+import com.eliteconnect.userservice.security.JwtRequestFilter;
+import com.eliteconnect.userservice.security.UserDetailsServiceImpl;
+
+import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final UserService userService;
-    // Removed direct injection of JwtRequestFilter here, it's method-injected into securityFilterChain
-
-    public SecurityConfig(@Lazy UserService userService) {
-        this.userService = userService;
-    }
+    private final UserRepository userRepository;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtRequestFilter jwtRequestFilter) throws Exception {
-        http
-            .csrf(AbstractHttpConfigurer::disable) // Disable CSRF for stateless API
-            .cors(cors -> cors.configurationSource(corsConfigurationSource())) // NEW: Configure CORS
-            .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/api/users/login", "/api/users/register").permitAll() // Allow public access
-                .anyRequest().authenticated() // All other requests require authentication
-            )
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Stateless for JWT
-            )
-            .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class); // Add JWT Filter
-
-        return http.build();
+    public UserDetailsService userDetailsService() {
+        return new UserDetailsServiceImpl(userRepository);
     }
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+    
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService());
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
-
-    @Bean
-    public UserDetailsService userDetailsService(UserService userService) {
-        return username -> {
-            return userService.findUserByUsername(username)
-                    .map(CustomUserDetails::new)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-        };
-    }
-
-    @Bean
-    public DaoAuthenticationProvider authenticationProvider(UserDetailsService userDetailsService, BCryptPasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder);
-        return authProvider;
-    }
-
-    // NEW BEAN: CORS Configuration Source
+    
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true); // Allow credentials (e.g., cookies, authorization headers)
-        config.setAllowedOrigins(Arrays.asList("http://localhost:3000", "http://localhost:8080")); // Add your frontend origin here, or "*" for all
-        config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type")); // Allowed request headers
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS")); // Allowed HTTP methods
-        source.registerCorsConfiguration("/**", config); // Apply this CORS config to all paths
+        source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtRequestFilter jwtRequestFilter) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(authorize -> authorize
+                .requestMatchers(HttpMethod.POST, "/api/users/register", "/api/users/login").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/users/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/users").permitAll()
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
     }
 }

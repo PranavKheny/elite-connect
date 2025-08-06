@@ -1,26 +1,26 @@
 // frontend-app/src/components/UserProfile.js
 
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
+import { useAuth } from '../App';
 
-// --- Styled Components ---
+// --- Styled Components (with styling guide values) ---
 const StyledContainer = styled(motion.div)`
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: ${(props) => props.theme.colors.primary};
-  color: ${(props) => props.theme.colors.text};
+  background-color: #334155; /* Primary Background */
+  color: #f8fafc; /* Text */
   padding: 2rem;
 `;
 
 const StyledProfileBox = styled(motion.div)`
-  background-color: ${(props) => props.theme.colors.secondary};
+  background-color: #1f2937; /* Secondary Background */
   padding: 3rem;
-  border-radius: ${(props) => props.theme.borderRadius};
+  border-radius: 8px; /* Consistent border radius */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 600px;
@@ -30,66 +30,61 @@ const StyledHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: ${(props) => props.theme.spacing.large};
-  border-bottom: 1px solid ${(props) => props.theme.colors.accent};
-  padding-bottom: ${(props) => props.theme.spacing.medium};
+  margin-bottom: 2rem; /* Generous spacing */
+  border-bottom: 1px solid #94a3b8; /* Accent color */
+  padding-bottom: 1rem;
 `;
 
 const StyledTitle = styled.h2`
-  font-family: ${(props) => props.theme.fonts.heading};
-  font-size: ${(props) => props.theme.fontSizes.medium};
+  font-family: 'sans-serif';
+  font-size: 1.5rem;
   text-transform: uppercase;
-  color: ${(props) => props.theme.colors.text};
+  color: #f8fafc;
 `;
 
 const StyledInfo = styled.p`
-  font-family: ${(props) => props.theme.fonts.body};
-  margin-bottom: ${(props) => props.theme.spacing.medium};
-  color: ${(props) => props.theme.colors.text};
+  font-family: 'serif';
+  margin-bottom: 1rem;
+  color: #f8fafc;
 `;
 
 const StyledLabel = styled.span`
   font-weight: bold;
-  color: ${(props) => props.theme.colors.accent};
+  color: #94a3b8;
 `;
 
 const StyledButton = styled(motion.button)`
-  font-family: ${(props) => props.theme.fonts.heading};
+  font-family: 'sans-serif';
   font-weight: bold;
   padding: 0.5rem 1rem;
-  border-radius: ${(props) => props.theme.borderRadius};
+  border-radius: 8px;
   background-color: transparent;
-  border: 2px solid ${(props) => props.theme.colors.highlight};
-  color: ${(props) => props.theme.colors.text};
+  border: 2px solid #3b82f6;
+  color: #f8fafc;
   cursor: pointer;
   transition: background-color 0.3s, color 0.3s;
+  margin-left: 1rem;
 
   &:hover {
-    background-color: ${(props) => props.theme.colors.highlight};
-    color: ${(props) => props.theme.colors.primary};
+    background-color: #3b82f6;
+    color: #334155;
   }
 `;
 
 const StyledLogoutButton = styled(StyledButton)`
-  border: 2px solid ${(props) => props.theme.colors.danger};
-  color: ${(props) => props.theme.colors.danger};
+  border: 2px solid #ef4444; /* Danger color for logout button */
+  color: #ef4444;
 
   &:hover {
-    background-color: ${(props) => props.theme.colors.danger};
-    color: ${(props) => props.theme.colors.text};
+    background-color: #ef4444;
+    color: #f8fafc;
   }
-`;
-
-const StyledLink = styled.a`
-  color: ${(props) => props.theme.colors.highlight};
-  text-decoration: none;
-  margin-left: ${(props) => props.theme.spacing.small};
 `;
 
 const StyledMessage = styled.p`
   text-align: center;
-  font-family: ${(props) => props.theme.fonts.body};
-  color: ${(props) => props.theme.colors.text};
+  font-family: 'serif';
+  color: #f8fafc;
 `;
 
 // --- Animation Variants ---
@@ -99,58 +94,23 @@ const profileBoxVariants = {
 };
 
 const UserProfile = () => {
-  const [user, setUser] = useState(null);
-  const [message, setMessage] = useState('Loading profile...');
   const navigate = useNavigate();
+  const auth = useAuth();
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      const jwtToken = localStorage.getItem('jwtToken');
+    // Check if the user is verified after every render
+    if (auth.user && auth.user.isVerified) {
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 500);
+    }
+  }, [auth.user, navigate]);
 
-      if (!jwtToken) {
-        setMessage('You are not logged in. Redirecting to login...');
-        setTimeout(() => navigate('/login'), 1500);
-        return;
-      }
 
-      try {
-        const response = await axios.get('http://localhost:8080/api/users', {
-          headers: {
-            Authorization: `Bearer ${jwtToken}`,
-          },
-        });
-
-        const currentUser = response.data.find(u => u.username === 'testuser');
-        if (currentUser) {
-          setUser(currentUser);
-          setMessage('');
-        } else {
-          setMessage('Could not find user profile.');
-        }
-      } catch (error) {
-        console.error('Failed to fetch user profile:', error.response ? error.response.data : error.message);
-        setMessage('Session expired or access denied. Please log in again.');
-        localStorage.removeItem('jwtToken');
-        setTimeout(() => navigate('/login'), 2000);
-      }
-    };
-
-    fetchUserProfile();
-  }, [navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('jwtToken');
-    navigate('/login');
-  };
-
-  const handleEditProfile = () => {
-    console.log("Edit Profile button clicked!");
-  };
-
-  if (message) {
+  if (!auth.isAuthenticated) {
     return (
       <StyledContainer>
-        <StyledMessage>{message}</StyledMessage>
+        <StyledMessage>You are not logged in. Redirecting to login...</StyledMessage>
       </StyledContainer>
     );
   }
@@ -161,26 +121,34 @@ const UserProfile = () => {
         <StyledHeader>
           <StyledTitle>User Profile</StyledTitle>
           <div>
-            <StyledButton onClick={handleEditProfile}>Edit Profile</StyledButton>
-            <StyledLogoutButton onClick={handleLogout} style={{ marginLeft: '1rem' }}>
+            <StyledButton onClick={() => console.log("Edit Profile button clicked!")}>Edit Profile</StyledButton>
+            <StyledLogoutButton onClick={auth.logout}>
               Logout
             </StyledLogoutButton>
           </div>
         </StyledHeader>
-        {user ? (
+        {auth.user ? (
           <div>
             <StyledInfo>
-              <StyledLabel>Username:</StyledLabel> {user.username}
+              <StyledLabel>Username:</StyledLabel> {auth.user.username}
             </StyledInfo>
             <StyledInfo>
-              <StyledLabel>Full Name:</StyledLabel> {user.fullName}
+              <StyledLabel>Full Name:</StyledLabel> {auth.user.fullName}
             </StyledInfo>
             <StyledInfo>
-              <StyledLabel>Email:</StyledLabel> {user.email}
+              <StyledLabel>Email:</StyledLabel> {auth.user.email}
             </StyledInfo>
             <StyledInfo>
-              <StyledLabel>Bio:</StyledLabel> {user.bio || 'N/A'}
+              <StyledLabel>Bio:</StyledLabel> {auth.user.bio || 'N/A'}
             </StyledInfo>
+            <StyledInfo>
+              <StyledLabel>Verification Status:</StyledLabel> {auth.user.isVerified ? 'Verified' : 'Pending'}
+            </StyledInfo>
+            {auth.user.verificationNotes && (
+                <StyledInfo>
+                    <StyledLabel>Verification Notes:</StyledLabel> {auth.user.verificationNotes}
+                </StyledInfo>
+            )}
           </div>
         ) : (
           <StyledMessage>No user data found.</StyledMessage>

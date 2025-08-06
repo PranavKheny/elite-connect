@@ -56,15 +56,11 @@ public class User {
     @Column
     private String profilePictureUrl;
 
-    // *** CHANGES START HERE ***
     @Column(nullable = false)
-    private boolean isVerified = false; // New field for verification status, defaults to false
+    private boolean isVerified = false;
 
-    // An important design consideration: a new field for the verification process.
-    // Let's add a field for admin notes regarding verification. This is good practice.
     @Column(columnDefinition = "TEXT")
     private String verificationNotes;
-    // *** CHANGES END HERE ***
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
