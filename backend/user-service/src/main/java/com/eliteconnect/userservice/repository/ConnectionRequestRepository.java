@@ -1,3 +1,4 @@
+
 package com.eliteconnect.userservice.repository;
 
 import java.util.List;
@@ -12,4 +13,5 @@ import com.eliteconnect.userservice.match.ConnectionRequest;
 public interface ConnectionRequestRepository extends JpaRepository<ConnectionRequest, Long> {
     Optional<ConnectionRequest> findBySenderIdAndReceiverId(Long senderId, Long receiverId);
     List<ConnectionRequest> findByReceiverId(Long receiverId);
+    List<ConnectionRequest> findBySenderId(Long senderId); // NEW METHOD
 }

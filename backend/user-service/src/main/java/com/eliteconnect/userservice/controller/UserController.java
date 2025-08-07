@@ -1,3 +1,4 @@
+    
 package com.eliteconnect.userservice.controller;
 
 import java.util.List;
@@ -35,6 +36,8 @@ import com.eliteconnect.userservice.exception.DuplicateActionException;
 import com.eliteconnect.userservice.exception.UserNotFoundException;
 import com.eliteconnect.userservice.match.ConnectionRequest;
 import com.eliteconnect.userservice.match.Like;
+import com.eliteconnect.userservice.repository.ConnectionRequestRepository;
+import com.eliteconnect.userservice.repository.LikeRepository;
 import com.eliteconnect.userservice.repository.UserRepository;
 import com.eliteconnect.userservice.service.MatchingService;
 import com.eliteconnect.userservice.service.UserService;
@@ -53,7 +56,10 @@ public class UserController {
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
     private final JwtUtil jwtUtil;
-    private final UserRepository userRepository; // NEW: Inject UserRepository
+    private final UserRepository userRepository;
+    private final LikeRepository likeRepository;
+    private final ConnectionRequestRepository connectionRequestRepository;
+
 
     @PostMapping("/register")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRequest userRequest) {
@@ -91,7 +97,6 @@ public class UserController {
     public ResponseEntity<UserResponse> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        // Force fetching the latest user data from the database
         User user = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
         return ResponseEntity.ok(new UserResponse(user));
     }
@@ -133,6 +138,25 @@ public class UserController {
             .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + id));
         return ResponseEntity.ok(new UserResponse(user));
     }
+
+    @GetMapping("/likes")
+    public ResponseEntity<List<Like>> getLikesForCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
+        List<Like> likes = likeRepository.findByLikerId(currentUser.getId());
+        return ResponseEntity.ok(likes);
+    }
+
+    @GetMapping("/connections")
+    public ResponseEntity<List<ConnectionRequest>> getConnectionsForCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
+        List<ConnectionRequest> connections = connectionRequestRepository.findBySenderId(currentUser.getId());
+        return ResponseEntity.ok(connections);
+    }
+
 
     @PostMapping("/{receiverId}/like")
     public ResponseEntity<?> likeUser(@PathVariable Long receiverId) {
