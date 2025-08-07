@@ -20,7 +20,7 @@ public class UserResponse {
     private String country;
     private String bio;
     private String profilePictureUrl;
-    private boolean isVerified;
+    private boolean verified; // CORRECTED field name
     private String verificationNotes;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -36,7 +36,7 @@ public class UserResponse {
         this.country = user.getCountry();
         this.bio = user.getBio();
         this.profilePictureUrl = user.getProfilePictureUrl();
-        this.isVerified = user.isVerified();
+        this.verified = user.isVerified(); // Map from isVerified() getter
         this.verificationNotes = user.getVerificationNotes();
         this.createdAt = user.getCreatedAt();
         this.updatedAt = user.getUpdatedAt();

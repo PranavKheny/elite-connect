@@ -31,13 +31,14 @@ import com.eliteconnect.userservice.dto.AuthResponse;
 import com.eliteconnect.userservice.dto.UserRequest;
 import com.eliteconnect.userservice.dto.UserResponse;
 import com.eliteconnect.userservice.dto.VerifyUserRequest;
+import com.eliteconnect.userservice.exception.DuplicateActionException;
+import com.eliteconnect.userservice.exception.UserNotFoundException;
+import com.eliteconnect.userservice.match.ConnectionRequest;
+import com.eliteconnect.userservice.match.Like;
+import com.eliteconnect.userservice.repository.UserRepository;
 import com.eliteconnect.userservice.service.MatchingService;
 import com.eliteconnect.userservice.service.UserService;
 import com.eliteconnect.userservice.util.JwtUtil;
-import com.eliteconnect.userservice.match.Like;
-import com.eliteconnect.userservice.match.ConnectionRequest;
-import com.eliteconnect.userservice.exception.UserNotFoundException;
-import com.eliteconnect.userservice.exception.DuplicateActionException;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,7 @@ public class UserController {
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
     private final JwtUtil jwtUtil;
+    private final UserRepository userRepository; // NEW: Inject UserRepository
 
     @PostMapping("/register")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRequest userRequest) {
@@ -75,6 +77,9 @@ public class UserController {
         authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword())
         );
+        
+        final User user = userService.findUserByUsername(authRequest.getUsername())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getUsername());
         final String jwt = jwtUtil.generateToken(userDetails);
@@ -86,6 +91,7 @@ public class UserController {
     public ResponseEntity<UserResponse> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
+        // Force fetching the latest user data from the database
         User user = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
         return ResponseEntity.ok(new UserResponse(user));
     }
@@ -104,7 +110,11 @@ public class UserController {
         @RequestParam(defaultValue = "10") int size,
         Pageable pageable) {
 
-        Page<User> userPage = userService.getPaginatedUsers(pageable);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
+        User currentUser = userService.findUserByUsername(currentUsername).orElseThrow(() -> new UserNotFoundException("Current user not found"));
+        
+        Page<User> userPage = userRepository.findAllUsersExcludingCurrentUser(currentUser.getId(), pageable);
 
         List<UserResponse> userResponses = userPage.getContent().stream()
             .map(UserResponse::new)
@@ -124,7 +134,6 @@ public class UserController {
         return ResponseEntity.ok(new UserResponse(user));
     }
 
-    // --- NEW ENDPOINTS FOR LIKES AND CONNECTION REQUESTS ---
     @PostMapping("/{receiverId}/like")
     public ResponseEntity<?> likeUser(@PathVariable Long receiverId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -150,7 +159,6 @@ public class UserController {
         }
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
-    // --- END NEW ENDPOINTS ---
 
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequest userRequest) {
