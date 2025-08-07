@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
+import { useAuth } from '../App'; // The useAuth hook is imported here
 
 const StyledContainer = styled(motion.div)`
   display: flex;
@@ -68,114 +69,166 @@ const StyledButton = styled(motion.button)`
   border: 2px solid #3b82f6;
   cursor: pointer;
   transition: background-color 0.3s, color 0.3s;
-
+  
   &:hover {
     background-color: #3b82f6;
     color: #334155;
   }
 `;
 
+const StyledMessage = styled.p`
+  font-family: 'serif';
+  text-align: center;
+  color: #f8fafc;
+`;
+
+
 const UserDashboard = () => {
-  const [users, setUsers] = useState([]);
-  const [message, setMessage] = useState('Loading users...');
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const navigate = useNavigate();
+    const [users, setUsers] = useState([]);
+    const [message, setMessage] = useState('Loading users...');
+    const [page, setPage] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+    const [userActions, setUserActions] = useState({ likes: [], connections: [] });
+    const navigate = useNavigate();
+    const auth = useAuth(); // NEW: The auth object is now correctly initialized
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      const jwtToken = localStorage.getItem('jwtToken');
+    // --- Fetches user's likes and connection requests ---
+    const fetchUserActions = async (token) => {
+        try {
+            const likesResponse = await axios.get('http://localhost:8080/api/users/likes', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
 
-      if (!jwtToken) {
-        setMessage('You are not logged in. Redirecting to login...');
-        setTimeout(() => navigate('/login'), 1500);
-        return;
-      }
+            const connectionsResponse = await axios.get('http://localhost:8080/api/users/connections', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setUserActions({ likes: likesResponse.data, connections: connectionsResponse.data });
 
-      try {
-        const response = await axios.get(`http://localhost:8080/api/users?page=${page}&size=10`, {
-          headers: {
-            Authorization: `Bearer ${jwtToken}`,
-          },
-        });
-        
-        setUsers(response.data);
-        setTotalPages(parseInt(response.headers['x-total-pages'], 10));
-        setMessage('');
-
-      } catch (error) {
-        console.error('Failed to fetch users:', error.response ? error.response.data : error.message);
-        setMessage('Session expired or access denied. Please log in again.');
-        localStorage.removeItem('jwtToken');
-        setTimeout(() => navigate('/login'), 2000);
-      }
+        } catch (error) {
+            console.error('Failed to fetch user actions:', error);
+        }
     };
 
-    fetchUsers();
-  }, [page, navigate]);
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const jwtToken = auth.token;
 
-  const handleLike = async (userId) => {
-      try {
-          await axios.post(`http://localhost:8080/api/users/${userId}/like`, {}, {
-              headers: {
-                  Authorization: `Bearer ${localStorage.getItem('jwtToken')}`,
-              },
-          });
-          setMessage('Liked user!');
-      } catch (error) {
-          setMessage(error.response.data.message || 'Error liking user.');
-      }
-  };
+            if (!jwtToken) {
+                setMessage('You are not logged in. Redirecting to login...');
+                setTimeout(() => navigate('/login'), 1500);
+                return;
+            }
+            
+            await fetchUserActions(jwtToken);
+            
+            try {
+                const response = await axios.get(`http://localhost:8080/api/users?page=${page}&size=10`, {
+                    headers: {
+                        Authorization: `Bearer ${jwtToken}`,
+                    },
+                });
+                
+                setUsers(response.data);
+                setTotalPages(parseInt(response.headers['x-total-pages'], 10));
+                setMessage('');
 
-  const handleConnect = async (userId) => {
-      try {
-          await axios.post(`http://localhost:8080/api/users/${userId}/connect`, {}, {
-              headers: {
-                  Authorization: `Bearer ${localStorage.getItem('jwtToken')}`,
-              },
-          });
-          setMessage('Connection request sent!');
-      } catch (error) {
-          setMessage(error.response.data.message || 'Error sending connection request.');
-      }
-  };
+            } catch (error) {
+                console.error('Failed to fetch users:', error.response ? error.response.data : error.message);
+                setMessage('Session expired or access denied. Please log in again.');
+                auth.logout();
+                setTimeout(() => navigate('/login'), 2000);
+            }
+        };
 
-  if (message) {
+        fetchUsers();
+    }, [page, auth, navigate]);
+
+    const handleLike = async (userId) => {
+        try {
+            await axios.post(`http://localhost:8080/api/users/${userId}/like`, {}, {
+                headers: {
+                    Authorization: `Bearer ${auth.token}`,
+                },
+            });
+            setMessage('Liked user!');
+            await fetchUserActions(auth.token);
+            setTimeout(() => setMessage(''), 1500);
+        } catch (error) {
+            if (error.response && error.response.data.message.includes('already liked')) {
+                await fetchUserActions(auth.token);
+            } else {
+                setMessage(error.response.data.message || 'Error liking user.');
+                setTimeout(() => setMessage(''), 3000);
+            }
+        }
+    };
+
+    const handleConnect = async (userId) => {
+        try {
+            await axios.post(`http://localhost:8080/api/users/${userId}/connect`, {}, {
+                headers: {
+                    Authorization: `Bearer ${auth.token}`,
+                },
+            });
+            setMessage('Connection request sent!');
+            await fetchUserActions(auth.token);
+            setTimeout(() => setMessage(''), 1500);
+        } catch (error) {
+            if (error.response && error.response.data.message.includes('already sent')) {
+                await fetchUserActions(auth.token);
+            } else {
+                setMessage(error.response.data.message || 'Error sending connection request.');
+                setTimeout(() => setMessage(''), 3000);
+            }
+        }
+    };
+
+    // --- Helper function to check if a user has been liked or a connection request has been sent ---
+    const hasLiked = (userId) => userActions.likes.some(like => like.likedUser.id === userId);
+    const hasSentRequest = (userId) => userActions.connections.some(conn => conn.receiver.id === userId);
+
+    if (message) {
+        return (
+            <StyledContainer>
+                <StyledMessage>{message}</StyledMessage>
+            </StyledContainer>
+        );
+    }
+
     return (
-      <StyledContainer>
-        <StyledProfileCard>
-          <StyledUsername>{message}</StyledUsername>
-        </StyledProfileCard>
-      </StyledContainer>
+        <StyledContainer>
+            <StyledUserList>
+                {users.map(user => (
+                    <StyledProfileCard key={user.id}>
+                        <StyledUsername>{user.username}</StyledUsername>
+                        <StyledBio>{user.bio}</StyledBio>
+                        <ButtonGroup>
+                            {hasLiked(user.id) ? (
+                                <StyledButton disabled>Liked</StyledButton>
+                            ) : (
+                                <StyledButton onClick={() => handleLike(user.id)}>Like</StyledButton>
+                            )}
+                            {hasSentRequest(user.id) ? (
+                                <StyledButton disabled>Request Sent</StyledButton>
+                            ) : (
+                                <StyledButton onClick={() => handleConnect(user.id)}>Connect</StyledButton>
+                            )}
+                        </ButtonGroup>
+                    </StyledProfileCard>
+                ))}
+            </StyledUserList>
+            {totalPages > 1 && (
+                <ButtonGroup style={{ marginTop: '2rem' }}>
+                    {page > 0 && (
+                        <StyledButton onClick={() => setPage(page - 1)}>Previous</StyledButton>
+                    )}
+                    {page < totalPages - 1 && (
+                        <StyledButton onClick={() => setPage(page + 1)}>Next</StyledButton>
+                    )}
+                </ButtonGroup>
+            )}
+        </StyledContainer>
     );
-  }
-
-  return (
-    <StyledContainer>
-      <StyledUserList>
-        {users.map(user => (
-          <StyledProfileCard key={user.id}>
-            <StyledUsername>{user.username}</StyledUsername>
-            <StyledBio>{user.bio}</StyledBio>
-            <ButtonGroup>
-              <StyledButton onClick={() => handleLike(user.id)}>Like</StyledButton>
-              <StyledButton onClick={() => handleConnect(user.id)}>Connect</StyledButton>
-            </ButtonGroup>
-          </StyledProfileCard>
-        ))}
-      </StyledUserList>
-      {totalPages > 1 && (
-        <ButtonGroup style={{ marginTop: '2rem' }}>
-          {page > 0 && (
-            <StyledButton onClick={() => setPage(page - 1)}>Previous</StyledButton>
-          )}
-          {page < totalPages - 1 && (
-            <StyledButton onClick={() => setPage(page + 1)}>Next</StyledButton>
-          )}
-        </ButtonGroup>
-      )}
-    </StyledContainer>
-  );
 };
 
 export default UserDashboard;

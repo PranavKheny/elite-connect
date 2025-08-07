@@ -123,14 +123,10 @@ const LoginForm = () => {
     e.preventDefault();
     setMessage('');
     try {
-      const response = await axios.post('/api/users/login', formData, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await axios.post('http://localhost:8080/api/users/login', formData);
       const jwtToken = response.data.jwtToken;
       
-      const userResponse = await axios.get('/api/users/me', {
+      const userResponse = await axios.get('http://localhost:8080/api/users/me', {
         headers: {
           Authorization: `Bearer ${jwtToken}`,
         },
@@ -139,14 +135,14 @@ const LoginForm = () => {
 
       auth.login(user, jwtToken);
 
-      if (user.isVerified) {
+      if (user.verified) { // Use 'verified' as per the backend UserResponse DTO
         setMessage('Login successful! Redirecting to dashboard...');
         setIsSuccess(true);
         setTimeout(() => {
           navigate('/dashboard');
         }, 1500);
       } else {
-        setMessage('Login successful! Redirecting to profile...');
+        setMessage('Login successful! Redirecting to profile for verification...');
         setIsSuccess(true);
         setTimeout(() => {
           navigate('/profile');

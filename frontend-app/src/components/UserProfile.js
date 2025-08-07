@@ -1,6 +1,7 @@
 // frontend-app/src/components/UserProfile.js
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
@@ -9,6 +10,7 @@ import { useAuth } from '../App';
 // --- Styled Components (with styling guide values) ---
 const StyledContainer = styled(motion.div)`
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
@@ -87,7 +89,28 @@ const StyledMessage = styled.p`
   color: #f8fafc;
 `;
 
-// --- Animation Variants ---
+const StyledVerificationStatusBox = styled(motion.div)`
+  background-color: ${(props) => props.theme.colors.secondary};
+  padding: 2rem;
+  border-radius: ${(props) => props.theme.borderRadius};
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-top: 2rem;
+  text-align: center;
+`;
+
+const StyledVerificationStatusTitle = styled.h3`
+  font-family: 'sans-serif';
+  font-size: 1.2rem;
+  color: #f8fafc;
+  margin-bottom: 0.5rem;
+`;
+
+const StyledVerificationStatusMessage = styled.p`
+  font-family: 'serif';
+  color: #94a3b8;
+  margin-bottom: 1rem;
+`;
+
 const profileBoxVariants = {
   hidden: { opacity: 0, y: 50 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
@@ -97,15 +120,14 @@ const UserProfile = () => {
   const navigate = useNavigate();
   const auth = useAuth();
 
-  useEffect(() => {
-    // Check if the user is verified after every render
-    if (auth.user && auth.user.isVerified) {
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 500);
-    }
-  }, [auth.user, navigate]);
+  const handleEditProfile = () => {
+    console.log("Edit Profile button clicked!");
+  };
 
+  const handleApplyForVerification = () => {
+      console.log("Apply for Verification button clicked!");
+      // This is where you would implement the logic to apply for verification
+  };
 
   if (!auth.isAuthenticated) {
     return (
@@ -121,7 +143,7 @@ const UserProfile = () => {
         <StyledHeader>
           <StyledTitle>User Profile</StyledTitle>
           <div>
-            <StyledButton onClick={() => console.log("Edit Profile button clicked!")}>Edit Profile</StyledButton>
+            <StyledButton onClick={handleEditProfile}>Edit Profile</StyledButton>
             <StyledLogoutButton onClick={auth.logout}>
               Logout
             </StyledLogoutButton>
@@ -142,7 +164,7 @@ const UserProfile = () => {
               <StyledLabel>Bio:</StyledLabel> {auth.user.bio || 'N/A'}
             </StyledInfo>
             <StyledInfo>
-              <StyledLabel>Verification Status:</StyledLabel> {auth.user.isVerified ? 'Verified' : 'Pending'}
+              <StyledLabel>Verification Status:</StyledLabel> {auth.user.verified ? 'Verified' : 'Pending'}
             </StyledInfo>
             {auth.user.verificationNotes && (
                 <StyledInfo>
@@ -154,6 +176,21 @@ const UserProfile = () => {
           <StyledMessage>No user data found.</StyledMessage>
         )}
       </StyledProfileBox>
+      {auth.user && !auth.user.verified && (
+          <StyledVerificationStatusBox
+              variants={profileBoxVariants}
+              initial="hidden"
+              animate="visible"
+          >
+              <StyledVerificationStatusTitle>Account Pending Verification</StyledVerificationStatusTitle>
+              <StyledVerificationStatusMessage>
+                  Your account is currently being reviewed. You can still edit your profile while you wait.
+              </StyledVerificationStatusMessage>
+              <StyledButton onClick={handleApplyForVerification}>
+                  Apply for Verification
+              </StyledButton>
+          </StyledVerificationStatusBox>
+      )}
     </StyledContainer>
   );
 };
