@@ -59,4 +59,27 @@ public class MatchingService {
 
         return Optional.of(connectionRequestRepository.save(newRequest));
     }
+
+    public Optional<ConnectionRequest> acceptConnectionRequest(Long requestId, Long userId) {
+        ConnectionRequest request = connectionRequestRepository.findById(requestId)
+                .orElseThrow(() -> new UserNotFoundException("Connection request not found"));
+
+        if (!request.getReceiver().getId().equals(userId)) {
+            throw new IllegalArgumentException("User is not authorized to accept this request.");
+        }
+
+        request.setStatus("ACCEPTED");
+        return Optional.of(connectionRequestRepository.save(request));
+    }
+
+    public void declineConnectionRequest(Long requestId, Long userId) {
+        ConnectionRequest request = connectionRequestRepository.findById(requestId)
+                .orElseThrow(() -> new UserNotFoundException("Connection request not found"));
+
+        if (!request.getReceiver().getId().equals(userId)) {
+            throw new IllegalArgumentException("User is not authorized to decline this request.");
+        }
+
+        connectionRequestRepository.delete(request);
+    }
 }

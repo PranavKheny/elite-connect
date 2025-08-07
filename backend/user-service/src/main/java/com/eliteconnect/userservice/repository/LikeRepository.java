@@ -1,4 +1,3 @@
-
 package com.eliteconnect.userservice.repository;
 
 import java.util.List;
@@ -12,5 +11,8 @@ import com.eliteconnect.userservice.match.Like;
 @Repository
 public interface LikeRepository extends JpaRepository<Like, Long> {
     Optional<Like> findByLikerIdAndLikedUserId(Long likerId, Long likedUserId);
-    List<Like> findByLikerId(Long likerId); // NEW METHOD
+    List<Like> findByLikerId(Long likerId);
+
+    // NEW METHOD to find likes a user has received
+    List<Like> findByLikedUserId(Long likedUserId);
 }

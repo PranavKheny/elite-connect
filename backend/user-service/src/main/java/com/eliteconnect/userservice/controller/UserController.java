@@ -1,4 +1,3 @@
-    
 package com.eliteconnect.userservice.controller;
 
 import java.util.List;
@@ -139,22 +138,44 @@ public class UserController {
         return ResponseEntity.ok(new UserResponse(user));
     }
 
-    @GetMapping("/likes")
-    public ResponseEntity<List<Like>> getLikesForCurrentUser() {
+    @GetMapping("/likes/received")
+    public ResponseEntity<List<Like>> getReceivedLikesForCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
         User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
-        List<Like> likes = likeRepository.findByLikerId(currentUser.getId());
-        return ResponseEntity.ok(likes);
+        List<Like> receivedLikes = likeRepository.findByLikedUserId(currentUser.getId());
+        return ResponseEntity.ok(receivedLikes);
     }
 
-    @GetMapping("/connections")
-    public ResponseEntity<List<ConnectionRequest>> getConnectionsForCurrentUser() {
+    @GetMapping("/connections/received")
+    public ResponseEntity<List<ConnectionRequest>> getReceivedConnectionRequests() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
         User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
-        List<ConnectionRequest> connections = connectionRequestRepository.findBySenderId(currentUser.getId());
-        return ResponseEntity.ok(connections);
+        List<ConnectionRequest> receivedRequests = connectionRequestRepository.findByReceiverIdAndStatus(currentUser.getId(), "PENDING");
+        return ResponseEntity.ok(receivedRequests);
+    }
+    
+    @PutMapping("/connections/{requestId}/accept")
+    public ResponseEntity<ConnectionRequest> acceptConnectionRequest(@PathVariable Long requestId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
+        
+        Optional<ConnectionRequest> acceptedRequest = matchingService.acceptConnectionRequest(requestId, currentUser.getId());
+        
+        return acceptedRequest.map(req -> ResponseEntity.ok(req)).orElse(ResponseEntity.notFound().build());
+    }
+    
+    @PutMapping("/connections/{requestId}/decline")
+    public ResponseEntity<Void> declineConnectionRequest(@PathVariable Long requestId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        matchingService.declineConnectionRequest(requestId, currentUser.getId());
+        
+        return ResponseEntity.noContent().build();
     }
 
 
@@ -184,6 +205,7 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
+    
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequest userRequest) {
         userService.getUserById(id)
