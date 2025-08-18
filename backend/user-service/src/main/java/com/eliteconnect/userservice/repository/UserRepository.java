@@ -18,4 +18,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // NEW METHOD FOR PAGINATION
     @Query("SELECT u FROM User u WHERE u.id <> :currentUserId")
     Page<User> findAllUsersExcludingCurrentUser(@Param("currentUserId") Long currentUserId, Pageable pageable);
+
+    @Query("SELECT u FROM User u WHERE u.id <> :currentUserId AND u.isVerified = true")
+    Page<User> findVerifiedUsersExcludingCurrentUser(@Param("currentUserId") Long currentUserId, Pageable pageable);
 }

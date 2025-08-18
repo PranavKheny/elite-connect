@@ -1,6 +1,7 @@
 package com.eliteconnect.userservice.controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -118,7 +119,8 @@ public class UserController {
         String currentUsername = authentication.getName();
         User currentUser = userService.findUserByUsername(currentUsername).orElseThrow(() -> new UserNotFoundException("Current user not found"));
         
-        Page<User> userPage = userRepository.findAllUsersExcludingCurrentUser(currentUser.getId(), pageable);
+        Page<User> userPage = userRepository.findVerifiedUsersExcludingCurrentUser(currentUser.getId(), pageable);
+
 
         List<UserResponse> userResponses = userPage.getContent().stream()
             .map(UserResponse::new)
@@ -155,6 +157,47 @@ public class UserController {
         List<ConnectionRequest> receivedRequests = connectionRequestRepository.findByReceiverIdAndStatus(currentUser.getId(), "PENDING");
         return ResponseEntity.ok(receivedRequests);
     }
+
+    @GetMapping("/likes/sent")
+    public ResponseEntity<List<Like>> getSentLikesForCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User currentUser = userService.findUserByUsername(username)
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
+        List<Like> sentLikes = likeRepository.findByLikerId(currentUser.getId());
+        return ResponseEntity.ok(sentLikes);
+    }
+
+    @GetMapping("/connections/sent")
+    public ResponseEntity<List<ConnectionRequest>> getSentConnectionRequests() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User currentUser = userService.findUserByUsername(username)
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
+        List<ConnectionRequest> sentRequests = connectionRequestRepository.findBySenderId(currentUser.getId());
+        return ResponseEntity.ok(sentRequests);
+    }
+
+    @GetMapping("/likes/sentIds")
+public ResponseEntity<List<Long>> getSentLikeTargetIds() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String username = authentication.getName();
+    User currentUser = userService.findUserByUsername(username)
+        .orElseThrow(() -> new UserNotFoundException("User not found"));
+    List<Long> ids = likeRepository.findLikedUserIdsByLikerId(currentUser.getId());
+    return ResponseEntity.ok(ids);
+}
+
+@GetMapping("/connections/sentIds")
+public ResponseEntity<List<Long>> getSentConnectionTargetIds() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String username = authentication.getName();
+    User currentUser = userService.findUserByUsername(username)
+        .orElseThrow(() -> new UserNotFoundException("User not found"));
+    List<Long> ids = connectionRequestRepository.findPendingReceiverIdsBySenderId(currentUser.getId());
+    return ResponseEntity.ok(ids);
+}
+
     
     @PutMapping("/connections/{requestId}/accept")
     public ResponseEntity<ConnectionRequest> acceptConnectionRequest(@PathVariable Long requestId) {
@@ -183,7 +226,17 @@ public class UserController {
     public ResponseEntity<?> likeUser(@PathVariable Long receiverId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        User liker = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
+        User liker = userService.findUserByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        User receiver = userService.getUserById(receiverId)
+                .orElseThrow(() -> new UserNotFoundException("Target user not found"));
+
+        // Guard: both must be verified
+        if (!Boolean.TRUE.equals(liker.isVerified()) || !Boolean.TRUE.equals(receiver.isVerified())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Likes are allowed only between verified members."));
+        }
 
         Optional<Like> like = matchingService.createLike(liker.getId(), receiverId);
         if (like.isEmpty()) {
@@ -196,7 +249,17 @@ public class UserController {
     public ResponseEntity<?> sendConnectionRequest(@PathVariable Long receiverId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        User sender = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
+        User sender = userService.findUserByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        User receiver = userService.getUserById(receiverId)
+                .orElseThrow(() -> new UserNotFoundException("Target user not found"));
+
+        // Guard: both must be verified
+        if (!Boolean.TRUE.equals(sender.isVerified()) || !Boolean.TRUE.equals(receiver.isVerified())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Connection requests are allowed only between verified members."));
+        }
 
         Optional<ConnectionRequest> request = matchingService.createConnectionRequest(sender.getId(), receiverId);
         if (request.isEmpty()) {

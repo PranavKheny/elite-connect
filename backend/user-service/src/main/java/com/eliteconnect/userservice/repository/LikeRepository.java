@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.eliteconnect.userservice.match.Like;
@@ -15,4 +17,8 @@ public interface LikeRepository extends JpaRepository<Like, Long> {
 
     // NEW METHOD to find likes a user has received
     List<Like> findByLikedUserId(Long likedUserId);
+
+    
+@Query("select l.likedUser.id from Like l where l.liker.id = :likerId")
+List<Long> findLikedUserIdsByLikerId(@Param("likerId") Long likerId);
 }
