@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.eliteconnect.userservice.User;
 import com.eliteconnect.userservice.dto.AuthRequest;
 import com.eliteconnect.userservice.dto.AuthResponse;
+import com.eliteconnect.userservice.dto.ConnectionRequestActivityDto;
 import com.eliteconnect.userservice.dto.UserRequest;
 import com.eliteconnect.userservice.dto.UserResponse;
 import com.eliteconnect.userservice.dto.VerifyUserRequest;
@@ -141,22 +142,50 @@ public class UserController {
     }
 
     @GetMapping("/likes/received")
-    public ResponseEntity<List<Like>> getReceivedLikesForCurrentUser() {
+    public ResponseEntity<List<com.eliteconnect.userservice.dto.LikeActivityDto>> getReceivedLikesForCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
+        User currentUser = userService.findUserByUsername(username)
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
+
         List<Like> receivedLikes = likeRepository.findByLikedUserId(currentUser.getId());
-        return ResponseEntity.ok(receivedLikes);
+
+        List<com.eliteconnect.userservice.dto.LikeActivityDto> dtos = receivedLikes.stream()
+            .map(like -> new com.eliteconnect.userservice.dto.LikeActivityDto(
+                like.getId(),
+                like.getLiker().getId(),
+                like.getLiker().getUsername(),
+                like.getCreatedAt()
+            ))
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
     }
 
+
     @GetMapping("/connections/received")
-    public ResponseEntity<List<ConnectionRequest>> getReceivedConnectionRequests() {
+    public ResponseEntity<List<ConnectionRequestActivityDto>> getReceivedConnectionRequests() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
-        List<ConnectionRequest> receivedRequests = connectionRequestRepository.findByReceiverIdAndStatus(currentUser.getId(), "PENDING");
-        return ResponseEntity.ok(receivedRequests);
+    String username = authentication.getName();
+    User currentUser = userService.findUserByUsername(username)
+        .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+    List<ConnectionRequest> received = connectionRequestRepository
+        .findByReceiverIdAndStatus(currentUser.getId(), "PENDING");
+
+    List<ConnectionRequestActivityDto> dtos = received.stream()
+        .map(req -> new ConnectionRequestActivityDto(
+            req.getId(),
+            req.getSender().getId(),
+            req.getSender().getUsername(),
+            req.getStatus(),
+            req.getCreatedAt()
+        ))
+        .collect(Collectors.toList());
+
+    return ResponseEntity.ok(dtos);
     }
+
 
     @GetMapping("/likes/sent")
     public ResponseEntity<List<Like>> getSentLikesForCurrentUser() {
