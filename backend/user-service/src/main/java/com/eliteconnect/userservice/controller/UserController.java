@@ -61,7 +61,6 @@ public class UserController {
     private final LikeRepository likeRepository;
     private final ConnectionRequestRepository connectionRequestRepository;
 
-
     @PostMapping("/register")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRequest userRequest) {
         User user = new User();
@@ -84,7 +83,7 @@ public class UserController {
         authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword())
         );
-        
+
         final User user = userService.findUserByUsername(authRequest.getUsername())
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
@@ -104,7 +103,7 @@ public class UserController {
 
     @PutMapping("/{id}/verify")
     public ResponseEntity<UserResponse> updateUserVerificationStatus(
-            @PathVariable Long id, 
+            @PathVariable Long id,
             @Valid @RequestBody VerifyUserRequest request) {
         User updatedUser = userService.updateUserVerificationStatus(id, request.isVerified(), request.getVerificationNotes());
         return ResponseEntity.ok(new UserResponse(updatedUser));
@@ -119,9 +118,8 @@ public class UserController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentUsername = authentication.getName();
         User currentUser = userService.findUserByUsername(currentUsername).orElseThrow(() -> new UserNotFoundException("Current user not found"));
-        
-        Page<User> userPage = userRepository.findVerifiedUsersExcludingCurrentUser(currentUser.getId(), pageable);
 
+        Page<User> userPage = userRepository.findVerifiedUsersExcludingCurrentUser(currentUser.getId(), pageable);
 
         List<UserResponse> userResponses = userPage.getContent().stream()
             .map(UserResponse::new)
@@ -162,30 +160,28 @@ public class UserController {
         return ResponseEntity.ok(dtos);
     }
 
-
     @GetMapping("/connections/received")
     public ResponseEntity<List<ConnectionRequestActivityDto>> getReceivedConnectionRequests() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    String username = authentication.getName();
-    User currentUser = userService.findUserByUsername(username)
-        .orElseThrow(() -> new UserNotFoundException("User not found"));
+        String username = authentication.getName();
+        User currentUser = userService.findUserByUsername(username)
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-    List<ConnectionRequest> received = connectionRequestRepository
-        .findByReceiverIdAndStatus(currentUser.getId(), "PENDING");
+        List<ConnectionRequest> received = connectionRequestRepository
+            .findByReceiverIdAndStatus(currentUser.getId(), "PENDING");
 
-    List<ConnectionRequestActivityDto> dtos = received.stream()
-        .map(req -> new ConnectionRequestActivityDto(
-            req.getId(),
-            req.getSender().getId(),
-            req.getSender().getUsername(),
-            req.getStatus(),
-            req.getCreatedAt()
-        ))
-        .collect(Collectors.toList());
+        List<ConnectionRequestActivityDto> dtos = received.stream()
+            .map(req -> new ConnectionRequestActivityDto(
+                req.getId(),
+                req.getSender().getId(),
+                req.getSender().getUsername(),
+                req.getStatus(),
+                req.getCreatedAt()
+            ))
+            .collect(Collectors.toList());
 
-    return ResponseEntity.ok(dtos);
+        return ResponseEntity.ok(dtos);
     }
-
 
     @GetMapping("/likes/sent")
     public ResponseEntity<List<Like>> getSentLikesForCurrentUser() {
@@ -208,48 +204,58 @@ public class UserController {
     }
 
     @GetMapping("/likes/sentIds")
-public ResponseEntity<List<Long>> getSentLikeTargetIds() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    String username = authentication.getName();
-    User currentUser = userService.findUserByUsername(username)
-        .orElseThrow(() -> new UserNotFoundException("User not found"));
-    List<Long> ids = likeRepository.findLikedUserIdsByLikerId(currentUser.getId());
-    return ResponseEntity.ok(ids);
-}
-
-@GetMapping("/connections/sentIds")
-public ResponseEntity<List<Long>> getSentConnectionTargetIds() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    String username = authentication.getName();
-    User currentUser = userService.findUserByUsername(username)
-        .orElseThrow(() -> new UserNotFoundException("User not found"));
-    List<Long> ids = connectionRequestRepository.findPendingReceiverIdsBySenderId(currentUser.getId());
-    return ResponseEntity.ok(ids);
-}
-
-    
-    @PutMapping("/connections/{requestId}/accept")
-    public ResponseEntity<ConnectionRequest> acceptConnectionRequest(@PathVariable Long requestId) {
+    public ResponseEntity<List<Long>> getSentLikeTargetIds() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
-        
-        Optional<ConnectionRequest> acceptedRequest = matchingService.acceptConnectionRequest(requestId, currentUser.getId());
-        
-        return acceptedRequest.map(req -> ResponseEntity.ok(req)).orElse(ResponseEntity.notFound().build());
+        User currentUser = userService.findUserByUsername(username)
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
+        List<Long> ids = likeRepository.findLikedUserIdsByLikerId(currentUser.getId());
+        return ResponseEntity.ok(ids);
     }
-    
+
+    @GetMapping("/connections/sentIds")
+    public ResponseEntity<List<Long>> getSentConnectionTargetIds() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User currentUser = userService.findUserByUsername(username)
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
+        List<Long> ids = connectionRequestRepository.findPendingReceiverIdsBySenderId(currentUser.getId());
+        return ResponseEntity.ok(ids);
+    }
+
+    // ===== FIX: return a DTO instead of a JPA entity to avoid ByteBuddy proxy serialization =====
+    @PutMapping("/connections/{requestId}/accept")
+    public ResponseEntity<ConnectionRequestActivityDto> acceptConnectionRequest(@PathVariable Long requestId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User currentUser = userService.findUserByUsername(username)
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        Optional<ConnectionRequest> acceptedRequest =
+            matchingService.acceptConnectionRequest(requestId, currentUser.getId());
+
+        return acceptedRequest
+            .map(req -> ResponseEntity.ok(
+                new ConnectionRequestActivityDto(
+                    req.getId(),
+                    req.getSender().getId(),
+                    req.getSender().getUsername(),
+                    req.getStatus(),
+                    req.getCreatedAt()
+                )))
+            .orElse(ResponseEntity.notFound().build());
+    }
+
     @PutMapping("/connections/{requestId}/decline")
     public ResponseEntity<Void> declineConnectionRequest(@PathVariable Long requestId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        User currentUser = userService.findUserByUsername(username).orElseThrow(() -> new UserNotFoundException("User not found"));
+        User currentUser = userService.findUserByUsername(username)
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         matchingService.declineConnectionRequest(requestId, currentUser.getId());
-        
         return ResponseEntity.noContent().build();
     }
-
 
     @PostMapping("/{receiverId}/like")
     public ResponseEntity<?> likeUser(@PathVariable Long receiverId) {
@@ -261,7 +267,6 @@ public ResponseEntity<List<Long>> getSentConnectionTargetIds() {
         User receiver = userService.getUserById(receiverId)
                 .orElseThrow(() -> new UserNotFoundException("Target user not found"));
 
-        // Guard: both must be verified
         if (!Boolean.TRUE.equals(liker.isVerified()) || !Boolean.TRUE.equals(receiver.isVerified())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message", "Likes are allowed only between verified members."));
@@ -284,7 +289,6 @@ public ResponseEntity<List<Long>> getSentConnectionTargetIds() {
         User receiver = userService.getUserById(receiverId)
                 .orElseThrow(() -> new UserNotFoundException("Target user not found"));
 
-        // Guard: both must be verified
         if (!Boolean.TRUE.equals(sender.isVerified()) || !Boolean.TRUE.equals(receiver.isVerified())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message", "Connection requests are allowed only between verified members."));
@@ -297,7 +301,6 @@ public ResponseEntity<List<Long>> getSentConnectionTargetIds() {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequest userRequest) {
         userService.getUserById(id)
