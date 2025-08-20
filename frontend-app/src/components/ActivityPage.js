@@ -1,11 +1,19 @@
 // frontend-app/src/components/ActivityPage.js
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
+import { toast } from 'react-toastify';
 import { useAuth } from '../App';
+
+import {
+  getReceivedLikes,
+  getReceivedConnections,
+  acceptConnection as apiAcceptConnection,
+  declineConnection as apiDeclineConnection,
+  fetchMatchesOf,
+} from '../services/api';
 
 const StyledContainer = styled(motion.div)`
   display: flex;
@@ -29,7 +37,7 @@ const StyledCard = styled(motion.div)`
   background-color: #1f2937;
   padding: 2rem;
   border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   width: 100%;
   max-width: 700px;
   margin-bottom: 2rem;
@@ -111,18 +119,17 @@ const Empty = styled.p`
   opacity: 0.75;
 `;
 
+/* ------------------------ helpers ------------------------ */
 function fromNow(ts) {
   if (!ts) return '';
   const created = new Date(ts);
-  const diffMs = Date.now() - created.getTime();
-  const s = Math.max(0, Math.floor(diffMs / 1000));
+  const s = Math.max(0, Math.floor((Date.now() - created.getTime()) / 1000));
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
 const ActivityPage = () => {
@@ -143,15 +150,11 @@ const ActivityPage = () => {
     try {
       if (!silent) setLoading(true);
       const [likesRes, consRes] = await Promise.all([
-        axios.get('http://localhost:8080/api/users/likes/received', {
-          headers: { Authorization: `Bearer ${auth.token}` }
-        }),
-        axios.get('http://localhost:8080/api/users/connections/received', {
-          headers: { Authorization: `Bearer ${auth.token}` }
-        })
+        getReceivedLikes(auth.token),
+        getReceivedConnections(auth.token),
       ]);
-      setLikes(Array.isArray(likesRes.data) ? likesRes.data : []);
-      setConnectionRequests(Array.isArray(consRes.data) ? consRes.data : []);
+      setLikes(Array.isArray(likesRes) ? likesRes : []);
+      setConnectionRequests(Array.isArray(consRes) ? consRes : []);
       if (!silent) setMessage('');
     } catch (err) {
       console.error('Failed to fetch activities:', err);
@@ -169,19 +172,37 @@ const ActivityPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.token]);
 
-  const handleAccept = async (requestId) => {
+  // Broadcast to other views that matches changed
+  const broadcastMatchesUpdate = async () => {
+    try {
+      const matches = await fetchMatchesOf(auth.user.id, auth.token);
+      // Custom event (same-tab listeners)
+      window.dispatchEvent(new CustomEvent('hnin:matches-updated', { detail: { at: Date.now(), matches } }));
+      // Storage ping (cross-tab; also usable as a simple signal)
+      localStorage.setItem('hnin:matches:ping', String(Date.now()));
+    } catch {
+      // non-fatal; dashboard still polls every 10s
+    }
+  };
+
+  const handleAccept = async (requestId, senderName) => {
     try {
       setBusyId(requestId);
-      await axios.put(
-        `http://localhost:8080/api/users/connections/${requestId}/accept`,
-        {},
-        { headers: { Authorization: `Bearer ${auth.token}` } }
-      );
+      await apiAcceptConnection(requestId, auth.token);
+      toast.success(`🎉 It’s a match with ${senderName}!`);
       setMessage('Connection request accepted.');
-      await fetchActivities(true);
+      await Promise.all([fetchActivities(true), broadcastMatchesUpdate()]);
     } catch (error) {
-      console.error('Error accepting request:', error);
-      setMessage('Error accepting request.');
+      const msg = String(error?.message || '');
+      // Treat idempotent “already accepted” as success UX-wise
+      if (/409|already/i.test(msg)) {
+        toast.info(`Already accepted ${senderName}.`);
+        await Promise.all([fetchActivities(true), broadcastMatchesUpdate()]);
+      } else {
+        console.error('Error accepting request:', error);
+        setMessage('Error accepting request.');
+        toast.error('Failed to accept request.');
+      }
     } finally {
       setBusyId(null);
     }
@@ -190,11 +211,7 @@ const ActivityPage = () => {
   const handleDecline = async (requestId) => {
     try {
       setBusyId(requestId);
-      await axios.put(
-        `http://localhost:8080/api/users/connections/${requestId}/decline`,
-        {},
-        { headers: { Authorization: `Bearer ${auth.token}` } }
-      );
+      await apiDeclineConnection(requestId, auth.token);
       setMessage('Connection request declined.');
       await fetchActivities(true);
     } catch (error) {
@@ -232,7 +249,7 @@ const ActivityPage = () => {
                   <Right>
                     <StyledButton
                       disabled={!pending || busyId === req.id}
-                      onClick={() => handleAccept(req.id)}
+                      onClick={() => handleAccept(req.id, senderName)}
                     >
                       Accept
                     </StyledButton>
@@ -270,8 +287,9 @@ const ActivityPage = () => {
                     <Subtle>{when}</Subtle>
                   </Left>
                   <Right>
-                    {/* Placeholder: later wire to a profile modal or /users/:id route */}
-                    <StyledButton disabled>View Profile</StyledButton>
+                    <StyledButton onClick={() => navigate(`/dashboard?user=${like.likerId}`)}>
+                      View Profile
+                    </StyledButton>
                   </Right>
                 </StyledListItem>
               );

@@ -1,16 +1,17 @@
-// frontend-app/src/components/UserDashboard.js
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
 import { useAuth } from '../App';
+import { getSentLikeIds, getSentConnectionIds, fetchMatchesOf } from '../services/api';
 
+const BASE_URL = process.env.REACT_APP_API_BASE || 'http://localhost:8080';
+
+/* ============================== UI ============================== */
 const StyledContainer = styled(motion.div)`
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
   min-height: 100vh;
   background-color: #334155;
@@ -30,8 +31,8 @@ const StyledUserList = styled.div`
 const StyledProfileCard = styled(motion.div)`
   background-color: #1f2937;
   padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
   width: 300px;
   display: flex;
   flex-direction: column;
@@ -50,6 +51,7 @@ const StyledBio = styled.p`
   text-align: center;
   color: #94a3b8;
   margin-bottom: 1rem;
+  min-height: 2.5rem;
 `;
 
 const ButtonGroup = styled.div`
@@ -62,177 +64,289 @@ const StyledButton = styled(motion.button)`
   font-family: 'sans-serif';
   font-weight: bold;
   padding: 0.8rem 1.5rem;
-  border-radius: 8px;
+  border-radius: 10px;
   background-color: transparent;
   color: #3b82f6;
   border: 2px solid #3b82f6;
   cursor: pointer;
-  transition: background-color 0.3s, color 0.3s;
-
-  &:hover {
-    background-color: #3b82f6;
-    color: #334155;
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
+  transition: background-color .2s, color .2s, transform .05s;
+  &:hover { background-color: #3b82f6; color: #0f172a; }
+  &:active { transform: translateY(1px); }
+  &:disabled { opacity: .6; cursor: not-allowed; }
 `;
 
-const StyledMessage = styled.p`
+const Banner = styled.p`
   font-family: 'serif';
   text-align: center;
+  margin-bottom: 1rem;
 `;
 
+const Toast = styled.div`
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(34,197,94,.2);
+  border: 1px solid rgba(34,197,94,.5);
+  color: #e7fee7;
+  padding: 10px 14px;
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 10px rgba(0,0,0,.25);
+  z-index: 50;
+`;
+
+/* ============================== Helpers ============================== */
+const isVerifiedUser = (u) => {
+  if (u?.verified === true) return true;
+  const vs = (u?.verificationStatus || '').toString().toLowerCase();
+  return vs === 'verified';
+};
+const toId = (x) => String(x ?? '');
+
+// Accept arrays of primitives or objects ({receiverId}|{userId}|{targetId}|{id})
+const toUserIdSet = (arr) => {
+  const out = new Set();
+  (arr || []).forEach((item) => {
+    if (item == null) return;
+    if (typeof item === 'object') {
+      const id = item.receiverId ?? item.userId ?? item.targetId ?? item.id;
+      if (id != null) out.add(toId(id));
+    } else {
+      out.add(toId(item));
+    }
+  });
+  return out;
+};
+
+/* ============================== Component ============================== */
 const UserDashboard = () => {
+  const auth = useAuth();
+  const navigate = useNavigate();
+
+  // destructure primitives to satisfy ESLint deps
+  const token = auth?.token;
+  const myId  = auth?.user?.id;
+
   const [users, setUsers] = useState([]);
-  const [message, setMessage] = useState('Loading users...');
+  const [banner, setBanner] = useState('Loading users...');
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  // store sets of ids the current user has already acted on
   const [userActions, setUserActions] = useState({
     likedIds: new Set(),
     requestedIds: new Set(),
+    matchedIds: new Set(),
   });
 
-  const navigate = useNavigate();
-  const auth = useAuth();
+  const prevMatchedIdsRef = useRef(new Set());
+  const [toast, setToast] = useState('');
 
-  // ---- Fetch likes/requests the current user has SENT ----
-  const fetchUserActions = async (token) => {
+  const idToUsername = useMemo(() => {
+    const map = new Map();
+    users.forEach((u) => map.set(toId(u.id), u.username));
+    return map;
+  }, [users]);
+
+  const idToUsernameRef = useRef(new Map());
+  useEffect(() => { idToUsernameRef.current = idToUsername; }, [idToUsername]);
+
+  const showToast = (text) => {
+    setToast(text);
+    setTimeout(() => setToast(''), 2200);
+  };
+
+  /* --------- Data loaders (stable with useCallback) --------- */
+  const fetchUserActions = useCallback(async () => {
+    if (!token || !myId) return;
     try {
-      // endpoints that return *IDs only*
-      const likesResponse = await axios.get(
-        'http://localhost:8080/api/users/likes/sentIds',
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const [likesArr, reqArr, matchesArr] = await Promise.all([
+        getSentLikeIds(token),
+        getSentConnectionIds(token),
+        fetchMatchesOf(myId, token),
+      ]);
 
-      const connectionsResponse = await axios.get(
-        'http://localhost:8080/api/users/connections/sentIds',
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const likedIds     = toUserIdSet(likesArr);
+      const requestedIds = toUserIdSet(reqArr);
+      const matchedIds   = new Set((matchesArr || []).map((m) => toId(m.id)));
 
-      // normalize into Sets of IDs
-      setUserActions({
-        likedIds: new Set(likesResponse.data || []),
-        requestedIds: new Set(connectionsResponse.data || []),
-      });
+      setUserActions({ likedIds, requestedIds, matchedIds });
+
+      // New match toast
+      const prev = prevMatchedIdsRef.current;
+      const newly = [];
+      matchedIds.forEach((id) => { if (!prev.has(id)) newly.push(id); });
+      if (newly.length) {
+        const first = newly[0];
+        const name = idToUsernameRef.current.get(first);
+        showToast(name ? `It’s a match with ${name}!` : `It’s a match!`);
+      }
+      prevMatchedIdsRef.current = matchedIds;
     } catch (error) {
       console.error('Failed to fetch user actions:', error);
     }
-  };
+  }, [token, myId]);
 
-  // ---- Fetch users page + user actions ----
+  const fetchUsers = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/api/users?page=${page}&size=10`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const all = response.data || [];
+      const filtered = all.filter((u) => isVerifiedUser(u) && toId(u.id) !== toId(myId));
+      setUsers(filtered);
+
+      const pagesHeader = response.headers['x-total-pages'];
+      const pages = parseInt(pagesHeader, 10);
+      setTotalPages(Number.isNaN(pages) ? 0 : pages);
+      setBanner('');
+    } catch (error) {
+      console.error('Failed to fetch users:', error.response?.data || error.message);
+      setBanner('Session expired or access denied. Please log in again.');
+      // optional: auth.logout();  // keep or remove depending on your flow
+      setTimeout(() => navigate('/login'), 2000);
+    }
+  }, [token, myId, page, navigate]);
+
+  /* ------------------------------ Effects ------------------------------ */
+  // Initial load
   useEffect(() => {
-    const fetchUsers = async () => {
-      const jwtToken = auth.token;
-
-      if (!jwtToken) {
-        setMessage('You are not logged in. Redirecting to login...');
+    const boot = async () => {
+      if (!token) {
+        setBanner('You are not logged in. Redirecting to login...');
         setTimeout(() => navigate('/login'), 1500);
         return;
       }
-
-      await fetchUserActions(jwtToken);
-
-      try {
-        const response = await axios.get(
-          `http://localhost:8080/api/users?page=${page}&size=10`,
-          { headers: { Authorization: `Bearer ${jwtToken}` } }
-        );
-
-        setUsers(response.data || []);
-        const pages = parseInt(response.headers['x-total-pages'], 10);
-        setTotalPages(Number.isNaN(pages) ? 0 : pages);
-        setMessage('');
-      } catch (error) {
-        console.error(
-          'Failed to fetch users:',
-          error.response ? error.response.data : error.message
-        );
-        setMessage('Session expired or access denied. Please log in again.');
-        auth.logout();
-        setTimeout(() => navigate('/login'), 2000);
-      }
+      await Promise.all([fetchUserActions(), fetchUsers()]);
     };
+    boot();
+  }, [token, fetchUserActions, fetchUsers, navigate]);
 
-    fetchUsers();
-  }, [page, auth, navigate]);
+  // Poll as a backup
+  useEffect(() => {
+    if (!token) return;
+    const t = setInterval(() => fetchUserActions(), 10000);
+    return () => clearInterval(t);
+  }, [token, fetchUserActions]);
+
+  // Listen for Activity → “matches updated” (instant refresh)
+  useEffect(() => {
+    const onBump = () => fetchUserActions();
+    const onStorage = (e) => { if (e.key === 'hnin:matches:ping') fetchUserActions(); };
+    window.addEventListener('hnin:matches-updated', onBump);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('hnin:matches-updated', onBump);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [fetchUserActions]);
+
+  /* ------------------------------ Actions ------------------------------ */
+  const optimisticUpdate = (kind, userId) => {
+    const id = toId(userId);
+    setUserActions((prev) => {
+      const likedIds = new Set(prev.likedIds);
+      const requestedIds = new Set(prev.requestedIds);
+      const matchedIds = new Set(prev.matchedIds);
+      if (kind === 'like') likedIds.add(id);
+      if (kind === 'request') requestedIds.add(id);
+      return { likedIds, requestedIds, matchedIds };
+    });
+  };
 
   const handleLike = async (userId) => {
+    const id = toId(userId);
+    optimisticUpdate('like', id);
     try {
       await axios.post(
-        `http://localhost:8080/api/users/${userId}/like`,
+        `${BASE_URL}/api/users/${id}/like`,
         {},
-        { headers: { Authorization: `Bearer ${auth.token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      setMessage('Liked user!');
-      await fetchUserActions(auth.token); // refresh sets so button disables
-      setTimeout(() => setMessage(''), 1500);
+      await fetchUserActions();
     } catch (error) {
-      if (error.response?.data?.message?.toLowerCase().includes('already liked')) {
-        await fetchUserActions(auth.token);
-      } else {
-        setMessage(error.response?.data?.message || 'Error liking user.');
-        setTimeout(() => setMessage(''), 3000);
+      const msg = String(error?.response?.data?.message || error?.message || '');
+      if (/already/i.test(msg) || /409/.test(msg)) {
+        await fetchUserActions();
+        return;
       }
+      // rollback on true failure
+      setUserActions((prev) => {
+        const likedIds = new Set(prev.likedIds);
+        likedIds.delete(id);
+        return { ...prev, likedIds };
+      });
+      setBanner('Error liking user.');
+      setTimeout(() => setBanner(''), 2500);
     }
   };
 
   const handleConnect = async (userId) => {
+    const id = toId(userId);
+    optimisticUpdate('request', id);
     try {
       await axios.post(
-        `http://localhost:8080/api/users/${userId}/connect`,
+        `${BASE_URL}/api/users/${id}/connect`,
         {},
-        { headers: { Authorization: `Bearer ${auth.token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      setMessage('Connection request sent!');
-      await fetchUserActions(auth.token); // refresh sets so button disables
-      setTimeout(() => setMessage(''), 1500);
+      await fetchUserActions();
     } catch (error) {
-      if (error.response?.data?.message?.toLowerCase().includes('already sent')) {
-        await fetchUserActions(auth.token);
-      } else {
-        setMessage(error.response?.data?.message || 'Error sending connection request.');
-        setTimeout(() => setMessage(''), 3000);
+      const msg = String(error?.response?.data?.message || error?.message || '');
+      if (/already/i.test(msg) || /409/.test(msg)) {
+        await fetchUserActions();
+        return;
       }
+      setUserActions((prev) => {
+        const requestedIds = new Set(prev.requestedIds);
+        requestedIds.delete(id);
+        return { ...prev, requestedIds };
+      });
+      setBanner('Error sending connection request.');
+      setTimeout(() => setBanner(''), 2500);
     }
   };
 
-  const hasLiked = (userId) => userActions.likedIds.has(userId);
-  const hasSentRequest = (userId) => userActions.requestedIds.has(userId);
+  const hasLiked = (userId) => userActions.likedIds.has(toId(userId));
+  const hasSentRequest = (userId) => userActions.requestedIds.has(toId(userId));
+  const isMatched = (userId) => userActions.matchedIds.has(toId(userId));
 
-  if (message) {
+  if (banner) {
     return (
       <StyledContainer>
-        <StyledMessage>{message}</StyledMessage>
+        {toast && <Toast role="status">{toast}</Toast>}
+        <Banner>{banner}</Banner>
       </StyledContainer>
     );
   }
 
   return (
     <StyledContainer>
+      {toast && <Toast role="status">{toast}</Toast>}
+
       <StyledUserList>
         {users.map((user) => (
           <StyledProfileCard key={user.id}>
             <StyledUsername>{user.username}</StyledUsername>
-            <StyledBio>{user.bio}</StyledBio>
-            <ButtonGroup>
-              <StyledButton
-                disabled={hasLiked(user.id)}
-                onClick={() => handleLike(user.id)}
-              >
-                {hasLiked(user.id) ? 'Liked' : 'Like'}
-              </StyledButton>
+            <StyledBio>{user.bio || ' '}</StyledBio>
 
-              <StyledButton
-                disabled={hasSentRequest(user.id)}
-                onClick={() => handleConnect(user.id)}
-              >
-                {hasSentRequest(user.id) ? 'Request Sent' : 'Connect'}
-              </StyledButton>
+            <ButtonGroup>
+              {isMatched(user.id) ? (
+                <StyledButton onClick={() => navigate(`/messages?user=${encodeURIComponent(user.username)}`)}>
+                  Message
+                </StyledButton>
+              ) : (
+                <>
+                  <StyledButton disabled={hasLiked(user.id)} onClick={() => handleLike(user.id)}>
+                    {hasLiked(user.id) ? 'Liked' : 'Like'}
+                  </StyledButton>
+                  <StyledButton disabled={hasSentRequest(user.id)} onClick={() => handleConnect(user.id)}>
+                    {hasSentRequest(user.id) ? 'Request Sent' : 'Connect'}
+                  </StyledButton>
+                </>
+              )}
             </ButtonGroup>
           </StyledProfileCard>
         ))}
@@ -240,12 +354,8 @@ const UserDashboard = () => {
 
       {totalPages > 1 && (
         <ButtonGroup style={{ marginTop: '2rem' }}>
-          {page > 0 && (
-            <StyledButton onClick={() => setPage(page - 1)}>Previous</StyledButton>
-          )}
-          {page < totalPages - 1 && (
-            <StyledButton onClick={() => setPage(page + 1)}>Next</StyledButton>
-          )}
+          {page > 0 && <StyledButton onClick={() => setPage((p) => p - 1)}>Previous</StyledButton>}
+          {page < totalPages - 1 && <StyledButton onClick={() => setPage((p) => p + 1)}>Next</StyledButton>}
         </ButtonGroup>
       )}
     </StyledContainer>
