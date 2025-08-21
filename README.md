@@ -24,7 +24,8 @@ git clone https://github.com/PranavKheny/elite-connect.git
 ```
 
 **2. Start the Database Container**
-If the Postgres container is not already running, use the following command to start it.   
+If the Postgres container is not already running, use the following command to start it.  
+Open a terminal in VS Code, navigate to the elite-connect\infrastructure directory then run this:
 ```Bash
 docker compose up -d
 ```
