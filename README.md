@@ -21,15 +21,11 @@ git clone https://github.com/PranavKheny/elite-connect.git
 **2. Start the Database Container**
 If the Postgres container is not already running, use the following command to start it.   
 ```Bash
-docker run -d --name elite_connect_db `
-  -e POSTGRES_USER=user `
-  -e POSTGRES_PASSWORD=password `
-  -e POSTGRES_DB=elite_connect_db `
-  -p 5432:5432 postgres:13-alpine
+docker run -d --name elite_connect_db -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=elite_connect_db -p 5432:5432 postgres:13-alpine
 ```
 You can verify the container is running by using 
 ```Bash
-docker ps.
+docker ps
 ```
 To clear and reset the database, navigate to the elite-connect/infrastructure directory in your terminal and run:
 ```Bash
