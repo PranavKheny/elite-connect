@@ -39,6 +39,20 @@ const StyledProfileCard = styled(motion.div)`
   align-items: center;
 `;
 
+const InitialAvatar = styled.div`
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(59,130,246,.35), rgba(255,255,255,.08));
+  border: 1px solid rgba(255,255,255,.15);
+  color: #e8edf2;
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+`;
+
 const StyledUsername = styled.h3`
   font-family: 'sans-serif';
   font-size: 1.5rem;
@@ -81,19 +95,41 @@ const Banner = styled.p`
   margin-bottom: 1rem;
 `;
 
-const Toast = styled.div`
-  position: fixed;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(34,197,94,.2);
-  border: 1px solid rgba(34,197,94,.5);
-  color: #e7fee7;
-  padding: 10px 14px;
-  border-radius: 10px;
-  backdrop-filter: blur(4px);
-  box-shadow: 0 2px 10px rgba(0,0,0,.25);
-  z-index: 50;
+/* ---- Match modal ---- */
+const ModalScrim = styled.div`
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  display: grid; place-items: center;
+  z-index: 1000;
+`;
+const ModalCard = styled.div`
+  width: min(520px, 92vw);
+  background: #0f172a;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.4);
+  color: #e8edf2;
+`;
+const ModalTitle = styled.h3`
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 12px;
+  text-align: center;
+`;
+const MatchFaces = styled.div`
+  display: flex; justify-content: center; align-items: center; gap: 18px; margin: 12px 0 18px;
+`;
+const Face = styled(InitialAvatar)`
+  width: 72px; height: 72px; font-size: 1.4rem; margin: 0;
+`;
+const ModalActions = styled.div`
+  display: flex; justify-content: center; gap: 12px; margin-top: 8px;
+`;
+const Primary = styled(StyledButton)``;
+const Ghost = styled(StyledButton)`
+  border-color: rgba(255,255,255,.35);
+  color: #e8edf2;
 `;
 
 /* ============================== Helpers ============================== */
@@ -103,8 +139,6 @@ const isVerifiedUser = (u) => {
   return vs === 'verified';
 };
 const toId = (x) => String(x ?? '');
-
-// Accept arrays of primitives or objects ({receiverId}|{userId}|{targetId}|{id})
 const toUserIdSet = (arr) => {
   const out = new Set();
   (arr || []).forEach((item) => {
@@ -118,13 +152,31 @@ const toUserIdSet = (arr) => {
   });
   return out;
 };
+const initialOf = (name) => (name || '').trim().charAt(0).toUpperCase() || 'U';
+
+/* ---- Seen-once storage for match popups ---- */
+const seenKey = (meId) => `hnin:matchSeen:${meId}`;
+const loadSeen = (meId) => {
+  try {
+    const raw = localStorage.getItem(seenKey(meId));
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set((arr || []).map((x) => String(x)));
+  } catch { return new Set(); }
+};
+const saveSeen = (meId, set) => {
+  try { localStorage.setItem(seenKey(meId), JSON.stringify(Array.from(set))); } catch {}
+};
+const markSeen = (meId, matchUserId) => {
+  const s = loadSeen(meId);
+  s.add(String(matchUserId));
+  saveSeen(meId, s);
+};
 
 /* ============================== Component ============================== */
 const UserDashboard = () => {
   const auth = useAuth();
   const navigate = useNavigate();
 
-  // destructure primitives to satisfy ESLint deps
   const token = auth?.token;
   const myId  = auth?.user?.id;
 
@@ -139,8 +191,8 @@ const UserDashboard = () => {
     matchedIds: new Set(),
   });
 
-  const prevMatchedIdsRef = useRef(new Set());
-  const [toast, setToast] = useState('');
+  // Modal: show on the first unseen match (per user) only
+  const [matchModal, setMatchModal] = useState(null); // { id, username } | null
 
   const idToUsername = useMemo(() => {
     const map = new Map();
@@ -150,11 +202,6 @@ const UserDashboard = () => {
 
   const idToUsernameRef = useRef(new Map());
   useEffect(() => { idToUsernameRef.current = idToUsername; }, [idToUsername]);
-
-  const showToast = (text) => {
-    setToast(text);
-    setTimeout(() => setToast(''), 2200);
-  };
 
   /* --------- Data loaders (stable with useCallback) --------- */
   const fetchUserActions = useCallback(async () => {
@@ -172,16 +219,19 @@ const UserDashboard = () => {
 
       setUserActions({ likedIds, requestedIds, matchedIds });
 
-      // New match toast
-      const prev = prevMatchedIdsRef.current;
-      const newly = [];
-      matchedIds.forEach((id) => { if (!prev.has(id)) newly.push(id); });
-      if (newly.length) {
-        const first = newly[0];
-        const name = idToUsernameRef.current.get(first);
-        showToast(name ? `It’s a match with ${name}!` : `It’s a match!`);
+      // Seen-once logic
+      const seen = loadSeen(myId);
+      if (seen.size === 0) {
+        // First time on this device: treat all existing matches as already seen
+        saveSeen(myId, matchedIds);
+      } else {
+        const firstUnseen = Array.from(matchedIds).find((id) => !seen.has(id));
+        if (firstUnseen) {
+          const name = idToUsernameRef.current.get(firstUnseen) || '';
+          setMatchModal({ id: firstUnseen, username: name });
+          markSeen(myId, firstUnseen); // mark immediately so it never reopens
+        }
       }
-      prevMatchedIdsRef.current = matchedIds;
     } catch (error) {
       console.error('Failed to fetch user actions:', error);
     }
@@ -205,13 +255,11 @@ const UserDashboard = () => {
     } catch (error) {
       console.error('Failed to fetch users:', error.response?.data || error.message);
       setBanner('Session expired or access denied. Please log in again.');
-      // optional: auth.logout();  // keep or remove depending on your flow
       setTimeout(() => navigate('/login'), 2000);
     }
   }, [token, myId, page, navigate]);
 
   /* ------------------------------ Effects ------------------------------ */
-  // Initial load
   useEffect(() => {
     const boot = async () => {
       if (!token) {
@@ -231,7 +279,7 @@ const UserDashboard = () => {
     return () => clearInterval(t);
   }, [token, fetchUserActions]);
 
-  // Listen for Activity → “matches updated” (instant refresh)
+  // Activity → “matches updated”
   useEffect(() => {
     const onBump = () => fetchUserActions();
     const onStorage = (e) => { if (e.key === 'hnin:matches:ping') fetchUserActions(); };
@@ -272,7 +320,6 @@ const UserDashboard = () => {
         await fetchUserActions();
         return;
       }
-      // rollback on true failure
       setUserActions((prev) => {
         const likedIds = new Set(prev.likedIds);
         likedIds.delete(id);
@@ -313,10 +360,10 @@ const UserDashboard = () => {
   const hasSentRequest = (userId) => userActions.requestedIds.has(toId(userId));
   const isMatched = (userId) => userActions.matchedIds.has(toId(userId));
 
+  /* ------------------------------ Render ------------------------------ */
   if (banner) {
     return (
       <StyledContainer>
-        {toast && <Toast role="status">{toast}</Toast>}
         <Banner>{banner}</Banner>
       </StyledContainer>
     );
@@ -324,11 +371,38 @@ const UserDashboard = () => {
 
   return (
     <StyledContainer>
-      {toast && <Toast role="status">{toast}</Toast>}
+      {/* Match Modal (seen-once) */}
+      {matchModal && (
+        <ModalScrim onClick={() => setMatchModal(null)}>
+          <ModalCard onClick={(e) => e.stopPropagation()}>
+            <ModalTitle>It’s a match!</ModalTitle>
+            <MatchFaces>
+              <Face title="You">{initialOf(auth?.user?.username)}</Face>
+              <span style={{ opacity:.7 }}>✦</span>
+              <Face title={matchModal.username}>{initialOf(matchModal.username)}</Face>
+            </MatchFaces>
+            <p style={{textAlign:'center', opacity:.9, margin:'0 0 12px'}}>
+              You and <strong>{matchModal.username || 'this member'}</strong> liked each other.
+            </p>
+            <ModalActions>
+              <Primary onClick={() => {
+                setMatchModal(null);
+                const name = matchModal.username || '';
+                if (name) navigate(`/messages?user=${encodeURIComponent(name)}`);
+                else navigate('/messages');
+              }}>
+                Message now
+              </Primary>
+              <Ghost onClick={() => setMatchModal(null)}>Keep browsing</Ghost>
+            </ModalActions>
+          </ModalCard>
+        </ModalScrim>
+      )}
 
       <StyledUserList>
         {users.map((user) => (
           <StyledProfileCard key={user.id}>
+            <InitialAvatar title={user.username}>{initialOf(user.username)}</InitialAvatar>
             <StyledUsername>{user.username}</StyledUsername>
             <StyledBio>{user.bio || ' '}</StyledBio>
 
