@@ -1,83 +1,72 @@
-## HNIN Connect: A Professional Network for High Net-Worth Individuals
+### HNIN Connect: A Professional Network for High Net-Worth Individuals ### 
+This document provides instructions for setting up and running the Minimum Viable Product (MVP) for HNIN Connect, an exclusive social network for High Net-Worth Individuals.
 
-**MVP for an exclusive social network for High Net-Worth Individuals (HNIN).**
-
-### Prerequisites:
-- Git  
-- Docker (v28+)  
-- Java 17 (Temurin/Oracle)  
-- Node.js (v22+)  
-- npm (v10+)  
-- VS Code or terminal access  
-- Add user to docker-users group (then log out/in)  
-
----
-
-### Steps to run the project:
-
-**1) Clone the project:**
-```bash
+Prerequisites
+Before you begin, ensure you have the following software installed:  
+Git  
+Docker (v28+)  
+Java 17 (Temurin/Oracle)  
+Node.js (v22+)  
+npm (v10+)  
+  
+You will also need VS Code or terminal access. Remember to add your user to the docker-users group and then log out and log back in for the changes to take effect.
+  
+Getting Started  
+**1. Clone the Project**
+Open a terminal or PowerShell and clone the project repository:
+```Bash
 git clone https://github.com/PranavKheny/elite-connect.git
+```
 
-**2) Get the container running:**
-If the Postgres container isn’t running (your docker ps was empty), start it in PowerShell:
-
-docker run -d --name elite_connect_db `
-  -e POSTGRES_USER=user `
-  -e POSTGRES_PASSWORD=password `
-  -e POSTGRES_DB=elite_connect_db `
+**2. Start the Database Container**
+If the Postgres container is not already running, use the following command to start it.   
+```Bash
+docker run -d --name elite_connect_db \
+  -e POSTGRES_USER=user \
+  -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=elite_connect_db \
   -p 5432:5432 postgres:13-alpine
-
-docker ps   # should list elite_connect_db
-
-
-To clear and reset the database:
-In VS Code go to the elite-connect\infrastructure directory
-Then run:
-
+```
+You can verify the container is running by using 
+```Bash
+docker ps.
+```
+To clear and reset the database, navigate to the elite-connect/infrastructure directory in your terminal and run:
+```Bash
 docker compose down -v
 docker compose up -d
+```
 
-
-**3) To run the backend services:**
-In VS Code open another terminal
-Go to the elite-connect\backend\user-service directory
-Then run:
-
+**3. Run the Backend Services**
+Open a new terminal, navigate to the elite-connect/backend/user-service directory, and run the following command:
+```Bash
 .\mvnw spring-boot:run
-
-
-**4) To run the frontend services:**
-In VS Code open another terminal
-Go to the elite-connect\frontend-app directory
-Then run:
-
-npm install    # only the first time you want to run it, from next time you don’t need to
+```
+**4. Run the Frontend Services**
+Open a new terminal, navigate to the elite-connect/frontend-app directory, and run these commands.  
+The npm install command is only needed the first time you set up the project.
+```Bash
+npm install
 npm start
+```
 
-
-**5) To verify certain users:**
-Verify the container is running
-Run the SQL inside Postgres
-In VS Code, in a separate terminal from backend/frontend
-Go to the elite-connect\infrastructure directory
-Run:
-
-docker ps
+**5. Verifying Users**
+To manually verify a user, you'll need to run a SQL command inside the Postgres container.  
+First, ensure the container is running with docker ps.  
+Next, open a new terminal in the elite-connect/infrastructure directory and access the database's command line:  
+```Bash
 docker exec -it elite_connect_db psql -U user -d elite_connect_db
-
-
-It will open the SQL query command line in which you need to run this command to verify certain users (change username accordingly):
-
+```
+Once inside the SQL command line, run the following command to verify a user. Replace 'user1' with the desired username.
+```Bash
 UPDATE public.users SET is_verified = TRUE WHERE username IN ('user1');
-
-
-To check the user data and if they are verified, run this in the same SQL command line:
-
-SELECT id, username, is_verified FROM public.users WHERE username IN ('user1', 'user2');
-
-
-**npm error**
-If anyone hits a PowerShell script policy error with npm, they can run:
-
+```
+To check the verification status of users, use this command:
+```Bash
+SELECT id, username, is_verified FROM public.users WHERE username IN ('user1','user2');
+```
+**6. npm error**
+If you encounter a PowerShell script policy error with npm, you can resolve it by running the following command:
+```Bash
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+```
