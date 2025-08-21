@@ -19,7 +19,7 @@
 ```bash
 git clone https://github.com/PranavKheny/elite-connect.git
 
-2) Get the container running:
+**2) Get the container running:**
 If the Postgres container isnâ€™t running (your docker ps was empty), start it in PowerShell:
 
 docker run -d --name elite_connect_db `
@@ -39,7 +39,7 @@ docker compose down -v
 docker compose up -d
 
 
-3) To run the backend services:
+**3) To run the backend services:**
 In VS Code open another terminal
 Go to the elite-connect\backend\user-service directory
 Then run:
@@ -47,7 +47,7 @@ Then run:
 .\mvnw spring-boot:run
 
 
-4) To run the frontend services:
+**4) To run the frontend services:**
 In VS Code open another terminal
 Go to the elite-connect\frontend-app directory
 Then run:
@@ -56,7 +56,7 @@ npm install    # only the first time you want to run it, from next time you donâ
 npm start
 
 
-5) To verify certain users:
+**5) To verify certain users:**
 Verify the container is running
 Run the SQL inside Postgres
 In VS Code, in a separate terminal from backend/frontend
@@ -77,6 +77,7 @@ To check the user data and if they are verified, run this in the same SQL comman
 SELECT id, username, is_verified FROM public.users WHERE username IN ('user1', 'user2');
 
 
+**npm error**
 If anyone hits a PowerShell script policy error with npm, they can run:
 
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
