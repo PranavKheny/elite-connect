@@ -18,7 +18,7 @@ Steps to run the project:
 
 3) Get the container running:
         If the Postgres container isn’t running (your docker ps was empty), start it in powershell :
-        
+   
         docker run -d --name elite_connect_db `
           -e POSTGRES_USER=user `
           -e POSTGRES_PASSWORD=password `
