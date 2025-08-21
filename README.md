@@ -10,7 +10,12 @@ Node.js (v22+)
 npm (v10+)  
   
 You will also need VS Code or terminal access. Remember to add your user to the docker-users group and then log out and log back in for the changes to take effect.
-  
+
+To go to a certain directory:
+```Bash
+cd "full path"
+```
+
 Getting Started  
 **1. Clone the Project**
 Open a terminal or PowerShell and clone the project repository:
@@ -40,7 +45,8 @@ Open a new terminal, navigate to the elite-connect/backend/user-service director
 ```
 **4. Run the Frontend Services**
 Open a new terminal, navigate to the elite-connect/frontend-app directory, and run these commands.  
-The npm install command is only needed the first time you set up the project.
+The npm install command is only needed the first time you set up the project.  
+Look at 6. npm error if you run into an error.
 ```Bash
 npm install
 npm start
@@ -49,7 +55,7 @@ npm start
 **5. Verifying Users**
 To manually verify a user, you'll need to run a SQL command inside the Postgres container.  
 First, ensure the container is running with docker ps.  
-Next, open a new terminal in the elite-connect/infrastructure directory and access the database's command line:  
+Next, open a new terminal in the elite-connect/infrastructure directory and access the database's command line:    
 ```Bash
 docker exec -it elite_connect_db psql -U user -d elite_connect_db
 ```
@@ -57,9 +63,13 @@ Once inside the SQL command line, run the following command to verify a user. Re
 ```Bash
 UPDATE public.users SET is_verified = TRUE WHERE username IN ('user1');
 ```
-To check the verification status of users, use this command:
+To check the verification status of users, use this command:  
 ```Bash
 SELECT id, username, is_verified FROM public.users WHERE username IN ('user1','user2');
+```
+To exit the SQL query mode:
+```Bash
+\q
 ```
 **6. npm error**
 If you encounter a PowerShell script policy error with npm, you can resolve it by running the following command:
