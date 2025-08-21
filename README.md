@@ -14,10 +14,9 @@ Add user to docker-users group (then log out/in)
 Steps to run the project:
 
 1) Clone the project:
+       git clone https://github.com/PranavKheny/elite-connect.git
 
-    git clone https://github.com/PranavKheny/elite-connect.git
-
-2) Get the container running:
+3) Get the container running:
         If the Postgres container isn’t running (your docker ps was empty), start it in powershell :
         
         docker run -d --name elite_connect_db `
